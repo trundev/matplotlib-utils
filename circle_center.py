@@ -16,6 +16,8 @@ CIRCLE_STYLE = {'alpha':.5, 'fill':False, 'linestyle':':', 'color':'blue'}
 POINT_FMT = '+r'
 Z_VECTOR = numpy.array([0,0,1])
 
+ALLOW_OPTIMIZATION = 1
+
 #
 # Basic vector manipulations
 #
@@ -31,10 +33,18 @@ def normalize(vect):
 
 def intersect(vect, point0, point1):
     """Intersection between vector and line between two points"""
-    def _len(v):
-        # With 2D vectors numpy.cross() returns scalar
-        return vect_len(v) if v.shape else v
-    scale = _len(numpy.cross(point0, point1)) / _len(numpy.cross(point0, vect) + numpy.cross(vect, point1))
+    if ALLOW_OPTIMIZATION:
+        # Optimize out the cross product and square root (meaningful in 3D scenarios only):
+        # Scale = |AxB|^2 / [(AxB).(AxC) + (AxB).(CxB)] =
+        # = (|A|^2|B|^2 - |A.B|^2) / (A - B).[A(B.C) - B(A.C)]
+        scale = point0.dot(point0) * point1.dot(point1) - point0.dot(point1) ** 2
+        scale /= (point0 - point1).dot( point0 * point1.dot(vect) - point1 * point0.dot(vect))
+    else:
+        # Scale = |AxB| / (|AxC + CxB|)
+        def _len(v):
+            # With 2D vectors numpy.cross() returns scalar
+            return vect_len(v) if v.shape else v
+        scale = _len(numpy.cross(point0, point1)) / _len(numpy.cross(point0, vect) + numpy.cross(vect, point1))
     return vect * scale
 
 #
