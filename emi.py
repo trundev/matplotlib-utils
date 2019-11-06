@@ -77,87 +77,79 @@ def set_axes_equal(ax):
     set_axes_radius(ax, origin, radius)
 
 
-def calculate_integral(l_n, r):
-    """Calculate the integral from Biot–Savart law: "dl x r / sqrt(l^2 + R^2)^3"
-    (https://en.wikipedia.org/wiki/Biot–Savart_law)
-    Calculations are simplified by choosing the "l" origin to be the closest point to the target.
-    Thus "r = l^2 + R^2" and "|dl x r| = |dl|.R", where R is distance between the target and origin.
-
-    Arguments:
-        l_n - normalized vector along "l"
-        r - vector from the point being integrated to the target
-    """
-    # Use integral calculator: https://www.integral-calculator.com/:
-    # R/sqrt(x^2 + R^2)^3 dx => x / (R * sqrt(x^2 + R^2))
-    if False:
-        # Non-optimized calculation
-        # Integral = (l_n x r) * |l| / (|l_n x r| * |r| * |R|)
-        vect = numpy.cross(l_n, r)
-
-        # Normalize result vector
-        divider = numpy.sqrt(vect.dot(vect))
-
-        # Multiply by 'l' (l_n is in the opposite direction)
-        l = -l_n.dot(r)
-        vect *= l
-
-        # Divide by 'r'
-        divider *= numpy.sqrt(r.dot(r))
-
-        # Divide by 'R' ('l' is already flipped)
-        R = r + l * l_n
-        divider *= numpy.sqrt(R.dot(R))
-
-        if not divider:
-            return None
-        vect /= divider
-
-    else:
-        # Some optimizations -- avoid cross product normalization
-        # |l x r| = |l|.|r|.sin phi = |l|.|R|
-        # Integral = (l_n x r) * |l| / (R^2 * r)
-        vect = numpy.cross(l_n, r)
-
-        # Multiply by 'l' (l_n is in the opposite direction)
-        l = -l_n.dot(r)
-        vect *= l
-
-        # Divide by 'R^2' ('l' is already flipped)
-        R = r + l * l_n
-        divider = R.dot(R)
-
-        # Divide by 'r'
-        divider *= numpy.sqrt(r.dot(r))
-        if not divider:
-            return None
-        vect /= divider
-
-    return vect
-
 def calculate_emi(pt, line, coef=1):
+    """Calculate the magnetic field at specific point, induced by electric current flowing along
+    a line segment. Also, the direction where this field would shift, when the current is increased.
+    """
     emi_params = numpy.zeros((2, pt.shape[0]), dtype=numpy.float64)
 
     # Start and end 'r' vectors
     r0 = pt - line[0]
     r1 = pt - line[1]
 
+    # Calculate the integral from Biot–Savart law (https://en.wikipedia.org/wiki/Biot–Savart_law):
+    #   dl x r / sqrt(l^2 + R^2)^3
+    #
+    # The "l" origin is selected at the closest point to the target to simplify calculations.
+    # Thus "r = l^2 + R^2" and "|dl x r| = |dl|.R", where R is distance between the target and origin.
+    #
+    # Use integral calculator https://www.integral-calculator.com/ (substitute l with x):
+    #   int[ R/sqrt(x^2 + R^2)^3 dx ] = x / (R * sqrt(x^2 + R^2)) + C
     delta = line[1] - line[0]
     len2 = delta.dot(delta)
-    if len2:
-        # Normalized vector between start and end (it is useful)
-        delta_n = delta / numpy.sqrt(len2)
+    if not len2:
+        return emi_params   # Zero length, return zero EMI params
 
-        # Integral between start and end
-        B = calculate_integral(delta_n, r1) \
-            - calculate_integral(delta_n, r0)
+    # Normalized vector between start and end, useful for subsequent calculations
+    delta_n = delta / numpy.sqrt(len2)
 
-        emi_params[0] = B
-        emi_params[1] = numpy.cross(B, delta_n)
+    # The '-' is to base the vector at the origin, instead of at line[0]
+    l0 = -delta_n.dot(delta_n.dot(r0))
+    l1 = l0 + delta
+    R = l0 + r0
 
-    else:
-        # Unable to calculate EMI
-        delta_n = None
+    #
+    # Integral at the start of interval
+    #
+    # |l0 x r0| = |l0|.|R|
+    vect0 = numpy.cross(l0, r0)
 
+    # Divide by 'r0'
+    divider = numpy.sqrt(r0.dot(r0))
+    if not divider:
+        return None     # Target point is at line[0]
+    vect0 /= divider
+
+    #
+    # Integral at the end of interval
+    #
+    # |l1 x r1| = |l1|.|R|
+    vect1 = numpy.cross(l1, r1)
+
+    # Divide by 'r1'
+    divider = numpy.sqrt(r1.dot(r1))
+    if not divider:
+        return None     # Target point is at line[0]
+    vect1 /= divider
+
+    #
+    # Combine both integrals
+    #
+    # Divide by 'R^2'
+    divider = R.dot(R)
+    if not divider:
+        return None     # Target point is from line
+
+    B = (vect1 - vect0) / divider
+
+    emi_params[0] = B
+    # The direction of "movement" of B, when the current is increased, use the same magnitude as B
+    #
+    # Important:
+    #   The sum of B-s is NOT perpendicular to the sum of their perpendiculars. Thus, the direction
+    # of "movement" of the summary B can not be calculated from itself. These vectors must be
+    # summed separately.
+    emi_params[1] = numpy.cross(B, delta_n)
     return emi_params
 
 def main(argv):
@@ -198,7 +190,7 @@ def main(argv):
             dB = emi_pars['dB'].dot(FIELD_SCALE) + pt 
             ax.plot([pt[0], dB[0]], [pt[1], dB[1]], [pt[2], dB[2]], dB_FMT)
 
-        # The EMF inducted because of field change
+        # The EMF induced because of field change
         if EMF_FMT:
             emf = numpy.cross(emi_pars['B'], emi_pars['dB'])
             emf = emf.dot(FIELD_SCALE) + pt 
