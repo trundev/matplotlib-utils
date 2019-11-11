@@ -8,48 +8,50 @@ import matplotlib.pyplot as pyplot
 import mpl_toolkits.mplot3d as mplot3d
 
 # Source current flow
+SRC_Z_STEP = 0.01
 SOURCE_POLYLINE = [
-   [0., 0., .0],
-   [1., 0., .0],   # right
-   [1., 2., .0],   # up
-   [0., 2., .0],   # left
-   [0., 0., .0],   # down
+   [0., 0., 0 * SRC_Z_STEP],
+   [1., 0., 1 * SRC_Z_STEP],    # right
+   [1., 2., 2 * SRC_Z_STEP],    # up
+   [0., 2., 3 * SRC_Z_STEP],    # left
+   [0., 0., 4 * SRC_Z_STEP],    # down
 ]
-CURRENT = 1
 # Points to calculate induction vectors
+TGT_Y_POS = 1
+TGT_ROW_STEPS = 8
 TARGET_POINTS = [
-    [.5, 1., .02],  # Center
-    [.5, 1., 1],    # Center up
-    [0, 1., 1],    # Center up/left
-    [1, 1., 1],    # Center up/right
-    [-1, 1., .1],  # Center left
-    [ 2, 1., .1],  # Center right
-]
-TARGET_POINTS = [
+    # Top row
     *(
-        [x, 1, 1] for x in numpy.linspace(-.5, 1.5, num=8)
+        [x, TGT_Y_POS, 1] for x in numpy.linspace(-.5, 1.5, num=TGT_ROW_STEPS, endpoint=False)
      ),
+    # Right row
     *(
-        [-.5, 1, z] for z in numpy.linspace(-1, 1, num=8)
+        [1.5, TGT_Y_POS, z] for z in numpy.linspace(1, -1, num=TGT_ROW_STEPS, endpoint=False)
      ),
+    # Bottom row
     *(
-        [x, 1, -1] for x in numpy.linspace(-.5, 1.5, num=8)
+        [x, TGT_Y_POS, -1] for x in numpy.linspace(1.5, -.5, num=TGT_ROW_STEPS, endpoint=False)
      ),
+    # Left row
     *(
-        [1.5, 1, z] for z in numpy.linspace(-1, 1, num=8)
+        [-.5, TGT_Y_POS, z] for z in numpy.linspace(-1, 1, num=TGT_ROW_STEPS, endpoint=False)
      ),
 ]
+# Planar grid between [-.5, TGT_Y_POS, -1] and [1.5, TGT_Y_POS, 1]
+#TARGET_POINTS = numpy.linspace(
+#    numpy.linspace([-.5, TGT_Y_POS, -1], [1.5, TGT_Y_POS, -1], num=TGT_ROW_STEPS),
+#    numpy.linspace([-.5, TGT_Y_POS,  1], [1.5, TGT_Y_POS,  1], num=TGT_ROW_STEPS),
+#    num=TGT_ROW_STEPS
+#).reshape((-1,3))
 
-SOURCE_FMT = 'g'
-TARGET_FMT = '+b'
-B_FMT = '--m'
-dB_FMT = ':y'   #None   #
-EMF_FMT = '-.r' #None   #
 FIELD_SCALE = .2
+EMF_SCALE = .1
 
-# Vacuum permeability: H/m (Henry per meter) or N/A^2 (Newton per square ampere)
-M0 =  4 * numpy.pi * 1e-7
-M0_4PI = 1e-7   # Or M0 / 4 * numpy.pi
+SOURCE_FMT = dict(color='green', label='Source')
+TARGET_FMT = dict(color='blue', marker='+', label='Target')
+B_FMT = dict(color='magenta', linestyle='--', label='Field')
+dB_FMT = dict(color='yellow', linestyle=':', label='Field change')
+EMF_FMT = dict(color='red', linestyle='-.', label='EM Force')
 
 # From https://stackoverflow.com/questions/13685386/matplotlib-equal-unit-length-with-equal-aspect-ratio-z-axis-is-not-equal-to
 def set_axes_radius(ax, origin, radius):
@@ -117,7 +119,7 @@ def calculate_emi(pt, line, coef=1):
     # Divide by 'r0'
     divider = numpy.sqrt(r0.dot(r0))
     if not divider:
-        return None     # Target point is at line[0]
+        return None     # Target point coincides with "line[0]"
     vect0 /= divider
 
     #
@@ -129,7 +131,7 @@ def calculate_emi(pt, line, coef=1):
     # Divide by 'r1'
     divider = numpy.sqrt(r1.dot(r1))
     if not divider:
-        return None     # Target point is at line[0]
+        return None     # Target point coincides with "line[1]"
     vect1 /= divider
 
     #
@@ -138,7 +140,7 @@ def calculate_emi(pt, line, coef=1):
     # Divide by 'R^2'
     divider = R.dot(R)
     if not divider:
-        return None     # Target point is from line
+        return None     # Target point lies on the "line"
 
     B = (vect1 - vect0) / divider
 
@@ -152,6 +154,11 @@ def calculate_emi(pt, line, coef=1):
     emi_params[1] = numpy.cross(B, delta_n)
     return emi_params
 
+def plot_source(ax, src_lines):
+    src_lines = src_lines.transpose()
+    ##ax.plot(*src_lines.transpose(), **SOURCE_FMT)
+    return ax.quiver(*src_lines[:,:-1], *(src_lines[:,1:] - src_lines[:,:-1]), **SOURCE_FMT)
+
 def main(argv):
     """Main entry"""
     fig = pyplot.figure()
@@ -159,11 +166,11 @@ def main(argv):
 
     # EMI source lines
     src_lines = numpy.array(SOURCE_POLYLINE)
-    ax.plot(*src_lines.transpose(), SOURCE_FMT)
+    src_col = plot_source(ax, src_lines)
 
     # Target points
-    for pt in TARGET_POINTS:
-        ax.plot(*([v] for v in pt), TARGET_FMT)
+    tgts =  numpy.array(TARGET_POINTS).transpose()
+    tgt_col = ax.scatter(*tgts, **TARGET_FMT)
 
     # Calculate EMI parameters B and dB for each target point
     emi_params = []
@@ -172,29 +179,33 @@ def main(argv):
         emi_pars = None
         for idx in range(len(src_lines) - 1):
             emi = calculate_emi(pt, src_lines[idx:idx+2])
-            if emi_pars is None:
-                emi_pars = emi
-            else:
-                emi_pars += emi
-        emi_params.append({'pt': pt, 'B': emi_pars[0], 'dB': emi_pars[1]})
+            if emi is not None:     # Ignore collinear target points
+                if emi_pars is None:
+                    emi_pars = emi
+                else:
+                    emi_pars += emi
+        if emi_pars is not None:
+            emi_params.append({'pt': pt, 'B': emi_pars[0], 'dB': emi_pars[1]})
 
-    for emi_pars in emi_params:
-        pt = emi_pars['pt']
+    pts = numpy.array([emi_pars['pt'] for emi_pars in emi_params]).transpose()
 
-        # Magnetic field
-        B = emi_pars['B'].dot(FIELD_SCALE) + pt 
-        ax.plot([pt[0], B[0]], [pt[1], B[1]], [pt[2], B[2]], B_FMT)
+    # Magnetic field
+    if B_FMT:
+        B = [emi_pars['B'].dot(FIELD_SCALE) for emi_pars in emi_params]
+        B = numpy.array(B).transpose()
+        B_col = ax.quiver(*pts, *B, **B_FMT)
 
-        # The direction of "movement" of the field because of current increase
-        if dB_FMT:
-            dB = emi_pars['dB'].dot(FIELD_SCALE) + pt 
-            ax.plot([pt[0], dB[0]], [pt[1], dB[1]], [pt[2], dB[2]], dB_FMT)
+    # The direction of "movement" of the field because of current increase
+    if dB_FMT:
+        dB = [emi_pars['dB'].dot(FIELD_SCALE) for emi_pars in emi_params]
+        dB = numpy.array(dB).transpose()
+        dB_col = ax.quiver(*pts, *dB, **dB_FMT)
 
-        # The EMF induced because of field change
-        if EMF_FMT:
-            emf = numpy.cross(emi_pars['B'], emi_pars['dB'])
-            emf = emf.dot(FIELD_SCALE) + pt 
-            ax.plot([pt[0], emf[0]], [pt[1], emf[1]], [pt[2], emf[2]], EMF_FMT)
+    # The EMF induced because of field change
+    if EMF_FMT:
+        emf = [numpy.cross(emi_pars['B'], emi_pars['dB']).dot(EMF_SCALE) for emi_pars in emi_params]
+        emf = numpy.array(emf).transpose()
+        emf_col = ax.quiver(*pts, *emf, **EMF_FMT)
 
     set_axes_equal(ax)
 
