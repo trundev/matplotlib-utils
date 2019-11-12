@@ -5,6 +5,7 @@ Tested on python 3.7.5. Requires: numpy, matplotlib
 import sys
 import numpy
 import matplotlib.pyplot as pyplot
+import matplotlib.widgets as widgets
 import mpl_toolkits.mplot3d as mplot3d
 
 # Source current flow
@@ -159,6 +160,17 @@ def plot_source(ax, src_lines):
     ##ax.plot(*src_lines.transpose(), **SOURCE_FMT)
     return ax.quiver(*src_lines[:,:-1], *(src_lines[:,1:] - src_lines[:,:-1]), **SOURCE_FMT)
 
+class on_clicked:
+    def __init__(self, lines):
+        self.lines = lines
+
+    def __call__(self, label):
+        for line in self.lines:
+            if line.get_label() == label:
+                line.set_visible(not line.get_visible())
+                break
+        pyplot.draw()
+
 def main(argv):
     """Main entry"""
     fig = pyplot.figure()
@@ -207,9 +219,17 @@ def main(argv):
         emf = numpy.array(emf).transpose()
         emf_col = ax.quiver(*pts, *emf, **EMF_FMT)
 
+    # Check boxes to show/hide individual elements
+    lines = [src_col, tgt_col, B_col, dB_col, emf_col]
+    rax = pyplot.axes([0.02, 0.02, 0.2, 0.2])
+    labels = [line.get_label() for line in lines]
+    visibility = [line.get_visible() for line in lines]
+    check = widgets.CheckButtons(rax, labels, visibility)
+    check.on_clicked(on_clicked(lines))
+
     set_axes_equal(ax)
 
-    pyplot.legend()
+    ax.legend()
     pyplot.show()
     return 0
 
