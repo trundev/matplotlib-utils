@@ -7,8 +7,15 @@
 import sys
 import math
 import numpy
+import matplotlib.pyplot as pyplot
+import matplotlib.widgets as widgets
+import mpl_toolkits.mplot3d as mplot3d
 
 QUAT_DT=numpy.float64
+
+SOURCE_FMT = dict(color='green', label='Source')
+RESULT_FMT = dict(color='blue', label='Result')
+ROTATED_FMT = dict(color='cyan', label='Rotated')
 
 def normalize(quat):
     """Normalize (convert to unit vector/quaternion)
@@ -25,9 +32,9 @@ def quaternion_multiply(quat1, quat2):
         # Optimization using numpy cross-product
         # prod = (w1, V1)(w2, V2) = (w1*w2 - V1.V2, w1*V2 + w2*V1 + V1xV2)
         w1 = quat1[0]
-        V1 = numpy.array(quat1[1:], quat1.dtype)
+        V1 = quat1[1:]
         w2 = quat2[0]
-        V2 = numpy.array(quat2[1:], quat2.dtype)
+        V2 = quat2[1:]
         prod = numpy.zeros_like(quat1)
         prod[0] = w1*w2 - V1.dot(V2)
         prod[1:] = w1*V2 + w2*V1 + numpy.cross(V1, V2)
@@ -60,12 +67,39 @@ def quaternion_rot_angle(quat):
     """Angle of rotation: 2*atan2(|(x,y,z)|, w)
 
     Result in range 0-2*pi (0-360 degrees)"""
-    q = numpy.array(quat[1:], dtype=quat.dtype)
+    q = quat[1:]
     return 2 * math.atan2(q.dot(q)**.5, quat[0])
 
 def pad_vector_to_quaternion(vector):
     """Pad with zeros to make quaternion"""
     return numpy.array([ *[0]*(4 - len(vector)), *vector ])
+
+def plot_vectors(ax, vects, **kw):
+    """Draw vectors (also vector parts of queternions)"""
+    # Extract the vector part of the quaternions inside the list
+    vects = [v[1:] if len(v) > 3 else v for v in vects]
+    vects = numpy.array(vects).transpose()
+    return ax.quiver(*numpy.zeros_like(vects), *vects, **kw)
+
+class check_buttons:
+    """Handle show/hide check buttons"""
+    def __init__(self, lines=[]):
+        self.lines = lines
+
+    def __call__(self, label):
+        for line in self.lines:
+            if line.get_label() == label:
+                line.set_visible(not line.get_visible())
+                break
+        pyplot.draw()
+
+    def add_line(self, line):
+        self.lines.append(line)
+
+    def create(self, rax):
+        labels = [line.get_label() for line in self.lines]
+        visibility = [line.get_visible() for line in self.lines]
+        return widgets.CheckButtons(rax, labels, visibility)
 
 def main(argv):
     quats = []
@@ -73,8 +107,18 @@ def main(argv):
         quats.append( [float(x) for x in arg.split(',')] )
     print('Arguments:\n  ' + '\n  '.join( [str(x) for x in quats]))
 
+    fig = pyplot.figure()
+    ax = fig.gca(projection='3d')
+
+    # Plot two points to autoscale
+    ax.scatter([-1,1], [-1,1], [-1,1])
+
+    # Show source
+    plt_src = plot_vectors(ax, quats, **SOURCE_FMT)
+
     print('Result:')
     result = None
+    res_quats = []
     for quat in quats:
         # Check if this is quaternion
         is_quat = True
@@ -87,19 +131,35 @@ def main(argv):
             print('  Normalizing quaternion:', quaternion_to_str(quat), ':')
             quat = normalize(quat)
             print('    * rotation angle (+/-):', math.degrees(quaternion_rot_angle(quat)))
+            res_quats.append(quat)
 
         if result is None:
             result = quat
         else:
             print('  Multiplying:', quaternion_to_str(result), quaternion_to_str(quat), ':')
             result = quaternion_multiply(result, quat)
+            res_quats.append(result)
 
         print('    ', quaternion_to_str(result))
+
+    btns = check_buttons([plt_src])
+
+    if res_quats:
+        plt_res = plot_vectors(ax, res_quats, **RESULT_FMT)
+        btns.add_line(plt_res)
 
     # Quaternion and 3D vector: Do rotation
     if len(quats) == 2 and len(quats[0]) == 4 and len(quats[1]) == 3:
         vect = rotate_vector(quats[0], quats[1])
         print('Rotated vector:', quaternion_to_str(vect))
+        plt_rot = plot_vectors(ax, [vect], **ROTATED_FMT)
+        btns.add_line(plt_rot)
+
+    check = btns.create(pyplot.axes([0.02, 0.02, 0.2, 0.2]))
+    check.on_clicked(btns)
+
+    ax.legend()
+    pyplot.show()
 
 if __name__ == '__main__':
     exit(main(sys.argv[1:]))
