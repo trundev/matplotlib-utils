@@ -164,7 +164,28 @@ class check_buttons:
 def main(argv):
     quats = []
     for arg in argv:
-        quats.append( [float(x) for x in arg.split(',')] )
+        # Isolate prefix
+        arg = arg.split(':')
+        prefix = arg[0] if len(arg) > 1 else None
+        arg = arg[-1]
+        arg = [float(x) for x in arg.split(',')]
+
+        # Handle prefixes, like "-e:<...>"
+        if prefix:
+            if prefix == '-e' or prefix == '-E':
+                # Euler algles rotation (roll, pitch, yaw)
+                print('Convert Euler angles:', vect_to_str(arg))
+                if prefix == '-E':
+                    # Angle values in degrees
+                    arg = numpy.array(arg).dot(numpy.pi/180)
+                    print('   * in radians:', vect_to_str(arg))
+                arg = euler_to_quaternion(arg)
+                print('  ', vect_to_str(arg))
+            else:
+                print('Error: Unknown prefix:', prefix, file=sys.stderr)
+                return 255
+
+        quats.append(arg)
     print('Arguments:\n  ' + '\n  '.join( [str(x) for x in quats]))
 
     fig = pyplot.figure()
@@ -234,6 +255,7 @@ def main(argv):
 
     ax.legend()
     pyplot.show()
+    return 0
 
 if __name__ == '__main__':
     exit(main(sys.argv[1:]))
