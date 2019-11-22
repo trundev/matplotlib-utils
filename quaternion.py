@@ -49,12 +49,6 @@ def quaternion_multiply(quat1, quat2):
                         a1*d2 + b1*c2 - c1*b2 + d1*a2],
                        dtype=QUAT_DT)
 
-def quaternion_to_str(quat):
-    """Compact string representation"""
-    if quat is None:
-        return '<none>'
-    return '[' + ', '.join( ['%.3f'%x for x in quat]) + ']'
-
 def rotate_vector(quat, vector):
     """Rotate vector using qaternion"""
     quat = normalize(quat)
@@ -70,9 +64,18 @@ def quaternion_rot_angle(quat):
     q = quat[1:]
     return 2 * math.atan2(q.dot(q)**.5, quat[0])
 
+#
+# Utils
+#
 def pad_vector_to_quaternion(vector):
     """Pad with zeros to make quaternion"""
     return numpy.array([ *[0]*(4 - len(vector)), *vector ])
+
+def vect_to_str(quat, fmt='%.3f'):
+    """Compact string representation"""
+    if quat is None:
+        return '<none>'
+    return '[' + ', '.join( [fmt%x for x in quat]) + ']'
 
 def plot_vectors(ax, vects, **kw):
     """Draw vectors (also vector parts of queternions)"""
@@ -81,6 +84,9 @@ def plot_vectors(ax, vects, **kw):
     vects = numpy.array(vects).transpose()
     return ax.quiver(*numpy.zeros_like(vects), *vects, **kw)
 
+#
+# Show/hide check buttons in matplotlib axis view
+#
 class check_buttons:
     """Handle show/hide check buttons"""
     def __init__(self, lines=[]):
@@ -100,6 +106,9 @@ class check_buttons:
         labels = [line.get_label() for line in self.lines]
         visibility = [line.get_visible() for line in self.lines]
         return widgets.CheckButtons(rax, labels, visibility)
+
+    def reg(self, chk):
+        chk.on_clicked(self)
 
 def main(argv):
     quats = []
@@ -125,22 +134,25 @@ def main(argv):
         if len(quat) < 4:
             is_quat = False
             # Pad with zeros from start
+            print('  Pad vector:', vect_to_str(quat), ':')
             quat = pad_vector_to_quaternion(quat)
+            print('    ', vect_to_str(quat))
 
         if is_quat:
-            print('  Normalizing quaternion:', quaternion_to_str(quat), ':')
+            print('  Normalizing quaternion:', vect_to_str(quat), ':')
             quat = normalize(quat)
+            print('    ', vect_to_str(quat))
             print('    * rotation angle (+/-):', math.degrees(quaternion_rot_angle(quat)))
             res_quats.append(quat)
 
         if result is None:
             result = quat
         else:
-            print('  Multiplying:', quaternion_to_str(result), quaternion_to_str(quat), ':')
+            print('  Multiplying:', vect_to_str(result), vect_to_str(quat), ':')
             result = quaternion_multiply(result, quat)
+            print('    ', vect_to_str(result))
             res_quats.append(result)
 
-        print('    ', quaternion_to_str(result))
 
     btns = check_buttons([plt_src])
 
@@ -148,15 +160,20 @@ def main(argv):
         plt_res = plot_vectors(ax, res_quats, **RESULT_FMT)
         btns.add_line(plt_res)
 
-    # Quaternion and 3D vector: Do rotation
-    if len(quats) == 2 and len(quats[0]) == 4 and len(quats[1]) == 3:
-        vect = rotate_vector(quats[0], quats[1])
-        print('Rotated vector:', quaternion_to_str(vect))
-        plt_rot = plot_vectors(ax, [vect], **ROTATED_FMT)
+    # Quaternion and 3D vector(s): Do rotation
+    if len(quats) >= 2 and len(quats[0]) == 4 and numpy.all([len(q) == 3 for q in quats[1:]]):
+        vects = []
+        for vect in quats[1:]:
+            print('Rotated vector:', vect_to_str(vect))
+            vect = rotate_vector(quats[0], vect)
+            print('    ', vect_to_str(vect))
+            vects.append(vect)
+
+        plt_rot = plot_vectors(ax, vects, **ROTATED_FMT)
         btns.add_line(plt_rot)
 
     check = btns.create(pyplot.axes([0.02, 0.02, 0.2, 0.2]))
-    check.on_clicked(btns)
+    btns.reg(check)
 
     ax.legend()
     pyplot.show()
