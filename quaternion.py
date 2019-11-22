@@ -13,8 +13,9 @@ import mpl_toolkits.mplot3d as mplot3d
 
 QUAT_DT=numpy.float64
 
+SRC_QUAT_FMT = dict(color='blue', label='Quat axes')
 SOURCE_FMT = dict(color='green', label='Source')
-RESULT_FMT = dict(color='blue', label='Result')
+RESULT_FMT = dict(color='yellow', label='Result', visible=False)
 ROTATED_FMT = dict(color='cyan', label='Rotated')
 
 def normalize(quat):
@@ -194,10 +195,9 @@ def main(argv):
     # Plot two points to autoscale
     ax.scatter([-1,1], [-1,1], [-1,1])
 
-    # Show source
-    plt_src = plot_vectors(ax, quats, **SOURCE_FMT)
-
     print('Result:')
+    src_vects = []
+    src_quats = []
     result = None
     res_quats = []
     for quat in quats:
@@ -205,12 +205,14 @@ def main(argv):
         is_quat = True
         if len(quat) < 4:
             is_quat = False
+            src_vects.append(quat)
             # Pad with zeros from start
             print('  Pad vector:', vect_to_str(quat), ':')
             quat = pad_vector_to_quaternion(quat)
             print('    ', vect_to_str(quat))
 
         if is_quat:
+            src_quats.append(quat)
             print('  Normalizing quaternion:', vect_to_str(quat), ':')
             quat = normalize(quat)
             print('    ', vect_to_str(quat))
@@ -232,7 +234,12 @@ def main(argv):
             res_quats.append(result)
 
 
-    btns = check_buttons([plt_src])
+    # Show source data
+    btns = check_buttons()
+    if src_vects:
+        btns.add_line(plot_vectors(ax, src_vects, **SOURCE_FMT))
+    if src_quats:
+        btns.add_line(plot_vectors(ax, src_quats, **SRC_QUAT_FMT))
 
     if res_quats:
         plt_res = plot_vectors(ax, res_quats, **RESULT_FMT)
