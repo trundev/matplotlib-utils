@@ -65,6 +65,57 @@ def quaternion_rot_angle(quat):
     return 2 * math.atan2(q.dot(q)**.5, quat[0])
 
 #
+# Conversion between quaternion and Euler angles
+#
+def quaternion_to_euler(quat):
+    """Quaternion to Euler Angles Conversion
+
+    https://en.wikipedia.org/wiki/Conversion_between_quaternions_and_Euler_angles
+    quat = [q.w, q.x, q.y, q.z]
+    The quaternion must be normalized (unit quaternion)
+    """
+    # roll (x-axis rotation)
+    sinr_cosp = 2 * (quat[0] * quat[1] + quat[2] * quat[3])
+    cosr_cosp = 1 - 2 * (quat[1] * quat[1] + quat[2] * quat[2])
+    roll = math.atan2(sinr_cosp, cosr_cosp)
+
+    # pitch (y-axis rotation)
+    sinp = 2 * (quat[0] * quat[2] - quat[3] * quat[1])
+    if abs(sinp) >= 1:
+        pitch = math.copysign(math.pi / 2, sinp)  # use 90 degrees if out of range
+        print('Warning: Quaternion to Euler auto of range, sin(<pitch>)=', sinp, file=sys.stderr)
+    else:
+        pitch = math.asin(sinp)
+
+    # yaw (z-axis rotation)
+    siny_cosp = 2 * (quat[0] * quat[3] + quat[1] * quat[2])
+    cosy_cosp = 1 - 2 * (quat[2] * quat[2] + quat[3] * quat[3])
+    yaw = math.atan2(siny_cosp, cosy_cosp)
+
+    return numpy.array([roll, pitch, yaw])
+
+def euler_to_quaternion(euler):
+    """Euler Angles to Quaternion Conversion
+
+    euler = [roll, pitch, yaw]
+    """
+
+    # Abbreviations for the various angular functions
+    cy = math.cos(euler[2] * 0.5)
+    sy = math.sin(euler[2] * 0.5)
+    cp = math.cos(euler[1] * 0.5)
+    sp = math.sin(euler[1] * 0.5)
+    cr = math.cos(euler[0] * 0.5)
+    sr = math.sin(euler[0] * 0.5)
+
+    w = cy * cp * cr + sy * sp * sr
+    x = cy * cp * sr - sy * sp * cr
+    y = sy * cp * sr + cy * sp * cr
+    z = sy * cp * cr - cy * sp * sr
+
+    return [w, x, y, z]
+
+#
 # Utils
 #
 def pad_vector_to_quaternion(vector):
@@ -144,6 +195,12 @@ def main(argv):
             print('    ', vect_to_str(quat))
             print('    * rotation angle (+/-):', math.degrees(quaternion_rot_angle(quat)))
             res_quats.append(quat)
+
+            # Show Euler angles
+            euler = quaternion_to_euler(quat)
+            print('    * Euler angles:', vect_to_str(euler), 'rad, ', vect_to_str(euler.dot(180/numpy.pi), '%d'), 'deg')
+            quat_back = euler_to_quaternion(euler)
+            print('    * back-converted quaternion:', vect_to_str(quat_back))
 
         if result is None:
             result = quat
