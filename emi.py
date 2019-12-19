@@ -46,6 +46,10 @@ TARGET_POINTS = [
 #    num=TGT_ROW_STEPS
 #).reshape((-1,3))
 
+# Slider origin/direction parameters
+SOURCE_SLIDER_ORG = [0.5, 1, 0]
+TARGET_SLIDER_DIR = [0, 1, 0]
+
 FIELD_SCALE = .2
 EMF_SCALE = .1
 
@@ -85,15 +89,104 @@ def plot_source(ax, src_lines):
     ##ax.plot(*src_lines.transpose(), **SOURCE_FMT)
     return ax.quiver(*src_lines[:,:-1], *(src_lines[:,1:] - src_lines[:,:-1]), **SOURCE_FMT)
 
+def replace_collection(old, new):
+    """Replace collection by keeping its visibility"""
+    if old is not None:
+        visible = old.get_visible()
+        old.remove()
+        new.set_visible(visible)
+    return new
+
+class main_data:
+    src_lines = None
+    tgt_pts = None
+    # Matplotlib collections
+    src_coll = None
+    tgt_coll = None
+    B_coll= None
+    dB_coll= None
+    emf_coll= None
+
+    def __init__(self, ax):
+        self.ax = ax
+
+    def redraw(self, src_lines, tgt_pts):
+        # EMI source lines
+        if src_lines is None:
+            src_lines = self.src_lines
+        else:
+            self.src_coll = replace_collection(self.src_coll, plot_source(self.ax, src_lines))
+            self.src_lines = src_lines
+
+        # Target points
+        if tgt_pts is None:
+            tgt_pts = self.tgt_pts
+        else:
+            self.tgt_coll = replace_collection(self.tgt_coll, self.ax.scatter(*tgt_pts.transpose(), **TARGET_FMT))
+            self.tgt_pts = tgt_pts
+
+        # Calculate EMI parameters B and dB for each target point
+        emi_params = emi_calc.calc_all_emis(tgt_pts, src_lines)
+
+        pts = numpy.array([emi_pars['pt'] for emi_pars in emi_params]).transpose()
+
+        # Magnetic field
+        if B_FMT:
+            B = [emi_pars['B'].dot(FIELD_SCALE) for emi_pars in emi_params]
+            B = numpy.array(B).transpose()
+            self.B_coll = replace_collection(self.B_coll, self.ax.quiver(*pts, *B, **B_FMT))
+
+        # The direction of "movement" of the field because of current increase
+        if dB_FMT:
+            dB = [emi_pars['dB'].dot(FIELD_SCALE) for emi_pars in emi_params]
+            dB = numpy.array(dB).transpose()
+            self.dB_coll = replace_collection(self.dB_coll, self.ax.quiver(*pts, *dB, **dB_FMT))
+
+        # The EMF induced because of field change
+        if EMF_FMT:
+            emf = [numpy.cross(emi_pars['B'], emi_pars['dB']).dot(EMF_SCALE) for emi_pars in emi_params]
+            emf = numpy.array(emf).transpose()
+            self.emf_coll = replace_collection(self.emf_coll, self.ax.quiver(*pts, *emf, **EMF_FMT))
+        return True
+
+    def get_collections(self):
+        return [self.src_coll, self.tgt_coll, self.B_coll, self.dB_coll, self.emf_coll]
+
 class on_clicked:
-    def __init__(self, lines):
-        self.lines = lines
+    def __init__(self, data):
+        self.data = data
 
     def __call__(self, label):
-        for line in self.lines:
-            if line.get_label() == label:
-                line.set_visible(not line.get_visible())
+        for coll in self.data.get_collections():
+            if coll.get_label() == label:
+                coll.set_visible(not coll.get_visible())
                 break
+        pyplot.draw()
+
+class src_changed:
+    def __init__(self, data, origin):
+        self.data = data
+        self.origin = origin
+
+    def __call__(self, pos):
+        src_lines = numpy.array(SOURCE_POLYLINE)
+        for idx, pt in enumerate(src_lines):
+            src_lines[idx] = (pt - self.origin) * pos + self.origin
+
+        self.data.redraw(src_lines, None)
+        pyplot.draw()
+
+class tgt_changed:
+    def __init__(self, data, move_dir):
+        self.data = data
+        self.move_dir = move_dir
+
+    def __call__(self, pos):
+        tgt_pts = numpy.array(TARGET_POINTS)
+        for idx, _ in enumerate(tgt_pts):
+            tgt_pts[idx] += self.move_dir * pos
+
+        self.data.redraw(None, tgt_pts)
         pyplot.draw()
 
 def main(argv):
@@ -101,44 +194,27 @@ def main(argv):
     fig = pyplot.figure()
     ax = fig.gca(projection='3d', adjustable='box')#mplot3d.axes3d.Axes3D(fig)
 
-    # EMI source lines
-    src_lines = numpy.array(SOURCE_POLYLINE)
-    src_col = plot_source(ax, src_lines)
-
-    # Target points
-    tgt_pts = numpy.array(TARGET_POINTS)
-    tgt_col = ax.scatter(*tgt_pts.transpose(), **TARGET_FMT)
-
-    # Calculate EMI parameters B and dB for each target point
-    emi_params = emi_calc.calc_all_emis(tgt_pts, src_lines)
-
-    pts = numpy.array([emi_pars['pt'] for emi_pars in emi_params]).transpose()
-
-    # Magnetic field
-    if B_FMT:
-        B = [emi_pars['B'].dot(FIELD_SCALE) for emi_pars in emi_params]
-        B = numpy.array(B).transpose()
-        B_col = ax.quiver(*pts, *B, **B_FMT)
-
-    # The direction of "movement" of the field because of current increase
-    if dB_FMT:
-        dB = [emi_pars['dB'].dot(FIELD_SCALE) for emi_pars in emi_params]
-        dB = numpy.array(dB).transpose()
-        dB_col = ax.quiver(*pts, *dB, **dB_FMT)
-
-    # The EMF induced because of field change
-    if EMF_FMT:
-        emf = [numpy.cross(emi_pars['B'], emi_pars['dB']).dot(EMF_SCALE) for emi_pars in emi_params]
-        emf = numpy.array(emf).transpose()
-        emf_col = ax.quiver(*pts, *emf, **EMF_FMT)
+    # Initial drawing
+    data = main_data(ax)
+    data.redraw(numpy.array(SOURCE_POLYLINE), numpy.array(TARGET_POINTS))
 
     # Check boxes to show/hide individual elements
-    lines = [src_col, tgt_col, B_col, dB_col, emf_col]
     rax = pyplot.axes([0.02, 0.02, 0.2, 0.2])
-    labels = [line.get_label() for line in lines]
-    visibility = [line.get_visible() for line in lines]
+    colls = data.get_collections()
+    labels = [coll.get_label() for coll in colls]
+    visibility = [coll.get_visible() for coll in colls]
     check = widgets.CheckButtons(rax, labels, visibility)
-    check.on_clicked(on_clicked(lines))
+    check.on_clicked(on_clicked(data))
+
+    # Slider to scale source lines
+    rax = pyplot.axes([0.35, 0.10, 0.5, 0.04])
+    src_slider = widgets.Slider(rax, data.src_coll.get_label(), 0, 2, 1)
+    src_slider.on_changed(src_changed(data, numpy.array(SOURCE_SLIDER_ORG)))
+
+    # Slider to move target points
+    rax = pyplot.axes([0.35, 0.02, 0.5, 0.04])
+    tgt_slider = widgets.Slider(rax, data.tgt_coll.get_label(), -2, 2, 0)
+    tgt_slider.on_changed(tgt_changed(data, numpy.array(TARGET_SLIDER_DIR)))
 
     set_axes_equal(ax)
 
