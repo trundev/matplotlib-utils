@@ -1,12 +1,13 @@
-'''Electromagnetic induction model
+'''Electromagnetic induction model visualization
 
-Tested on python 3.7.5. Requires: numpy, matplotlib
+Tested on python 3.7.5. Requires: numpy, matplotlib, emi_calc
 '''
 import sys
 import numpy
 import matplotlib.pyplot as pyplot
 import matplotlib.widgets as widgets
 import mpl_toolkits.mplot3d as mplot3d
+import emi_calc
 
 # Source current flow
 SRC_Z_STEP = 0.01
@@ -79,82 +80,6 @@ def set_axes_equal(ax):
     radius = 0.5 * numpy.max(numpy.abs(limits[:, 1] - limits[:, 0]))
     set_axes_radius(ax, origin, radius)
 
-
-def calculate_emi(pt, line, coef=1):
-    """Calculate the magnetic field at specific point, induced by electric current flowing along
-    a line segment. Also, the direction where this field would shift, when the current is increased.
-    """
-    emi_params = numpy.zeros((2, pt.shape[0]), dtype=numpy.float64)
-
-    # Start and end 'r' vectors
-    r0 = pt - line[0]
-    r1 = pt - line[1]
-
-    # Calculate the integral from Biot–Savart law (https://en.wikipedia.org/wiki/Biot–Savart_law):
-    #   dl x r / sqrt(l^2 + R^2)^3
-    #
-    # The "l" origin is selected at the closest point to the target to simplify calculations.
-    # Thus "r = l^2 + R^2" and "|dl x r| = |dl|.R", where R is distance between the target and origin.
-    #
-    # Use integral calculator https://www.integral-calculator.com/ (substitute l with x):
-    #   int[ R/sqrt(x^2 + R^2)^3 dx ] = x / (R * sqrt(x^2 + R^2)) + C
-    delta = line[1] - line[0]
-    len2 = delta.dot(delta)
-    if not len2:
-        return emi_params   # Zero length, return zero EMI params
-
-    # Normalized vector between start and end, useful for subsequent calculations
-    delta_n = delta / numpy.sqrt(len2)
-
-    # The '-' is to base the vector at the origin, instead of at line[0]
-    l0 = -delta_n.dot(delta_n.dot(r0))
-    l1 = l0 + delta
-    R = l0 + r0
-
-    #
-    # Integral at the start of interval
-    #
-    # |l0 x r0| = |l0|.|R|
-    vect0 = numpy.cross(l0, r0)
-
-    # Divide by 'r0'
-    divider = numpy.sqrt(r0.dot(r0))
-    if not divider:
-        return None     # Target point coincides with "line[0]"
-    vect0 /= divider
-
-    #
-    # Integral at the end of interval
-    #
-    # |l1 x r1| = |l1|.|R|
-    vect1 = numpy.cross(l1, r1)
-
-    # Divide by 'r1'
-    divider = numpy.sqrt(r1.dot(r1))
-    if not divider:
-        return None     # Target point coincides with "line[1]"
-    vect1 /= divider
-
-    #
-    # Combine both integrals
-    #
-    # Divide by 'R^2'
-    divider = R.dot(R)
-    if not divider:
-        return None     # Target point lies on the "line"
-
-    B = (vect1 - vect0) / divider
-
-    emi_params[0] = B
-    # The direction of "movement" of B, when the current is increased, use the same magnitude as B
-    #
-    # Important:
-    #   The sum of B-s is NOT perpendicular to the sum of their perpendiculars. Thus, the direction
-    # of "movement" of the summary B can not be calculated from itself. These vectors must be
-    # summed separately.
-    emi_params[1] = numpy.cross(B, delta_n)
-    return emi_params
-
 def plot_source(ax, src_lines):
     src_lines = src_lines.transpose()
     ##ax.plot(*src_lines.transpose(), **SOURCE_FMT)
@@ -181,23 +106,11 @@ def main(argv):
     src_col = plot_source(ax, src_lines)
 
     # Target points
-    tgts =  numpy.array(TARGET_POINTS).transpose()
-    tgt_col = ax.scatter(*tgts, **TARGET_FMT)
+    tgt_pts = numpy.array(TARGET_POINTS)
+    tgt_col = ax.scatter(*tgt_pts.transpose(), **TARGET_FMT)
 
     # Calculate EMI parameters B and dB for each target point
-    emi_params = []
-    for pt in TARGET_POINTS:
-        pt = numpy.array(pt)
-        emi_pars = None
-        for idx in range(len(src_lines) - 1):
-            emi = calculate_emi(pt, src_lines[idx:idx+2])
-            if emi is not None:     # Ignore collinear target points
-                if emi_pars is None:
-                    emi_pars = emi
-                else:
-                    emi_pars += emi
-        if emi_pars is not None:
-            emi_params.append({'pt': pt, 'B': emi_pars[0], 'dB': emi_pars[1]})
+    emi_params = emi_calc.calc_all_emis(tgt_pts, src_lines)
 
     pts = numpy.array([emi_pars['pt'] for emi_pars in emi_params]).transpose()
 
