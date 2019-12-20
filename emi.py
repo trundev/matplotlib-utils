@@ -53,6 +53,12 @@ TARGET_SLIDER_DIR = [0, 1, 0]
 FIELD_SCALE = .2
 EMF_SCALE = .1
 
+AX_MARGIN = .02
+AX_BTN_HEIGHT = .2
+AX_BTN_WIDTH = .25
+AX_TEXT_WIDTH = .08
+AX_NUM_SLIDERS = 2
+
 SOURCE_FMT = dict(color='green', label='Source')
 TARGET_FMT = dict(color='blue', marker='+', label='Target')
 B_FMT = dict(color='magenta', linestyle='--', label='Field')
@@ -96,6 +102,14 @@ def replace_collection(old, new):
         old.remove()
         new.set_visible(visible)
     return new
+
+def deflate_rect(rect, hor_margin=AX_MARGIN, vert_margin=AX_MARGIN):
+    """Deflate matplotlib rectangle [left, bottom, right, top]"""
+    rect[0] += hor_margin
+    rect[1] += vert_margin
+    rect[2] -= 2 * hor_margin
+    rect[3] -= 2 * vert_margin
+    return rect
 
 class main_data:
     src_lines = None
@@ -192,31 +206,38 @@ class tgt_changed:
 def main(argv):
     """Main entry"""
     fig = pyplot.figure()
-    ax = fig.gca(projection='3d', adjustable='box')#mplot3d.axes3d.Axes3D(fig)
+    rect = [0, AX_BTN_HEIGHT, 1, 1 - AX_BTN_HEIGHT]
+    ax = fig.add_axes(deflate_rect(rect), projection='3d', adjustable='box')
 
     # Initial drawing
     data = main_data(ax)
     data.redraw(numpy.array(SOURCE_POLYLINE), numpy.array(TARGET_POINTS))
 
+    set_axes_equal(ax)
+
     # Check boxes to show/hide individual elements
-    rax = pyplot.axes([0.02, 0.02, 0.2, 0.2])
+    rect = [0, 0, AX_BTN_WIDTH, AX_BTN_HEIGHT]
+    rax = fig.add_axes(deflate_rect(rect))
     colls = data.get_collections()
     labels = [coll.get_label() for coll in colls]
     visibility = [coll.get_visible() for coll in colls]
     check = widgets.CheckButtons(rax, labels, visibility)
     check.on_clicked(on_clicked(data))
 
-    # Slider to scale source lines
-    rax = pyplot.axes([0.35, 0.10, 0.5, 0.04])
+    # Slider to scale source lines (slider 1)
+    rect = [AX_BTN_WIDTH, 1 * AX_BTN_HEIGHT / AX_NUM_SLIDERS,
+            1 - AX_BTN_WIDTH, AX_BTN_HEIGHT / AX_NUM_SLIDERS]
+    rax = pyplot.axes(deflate_rect(rect, AX_TEXT_WIDTH + AX_MARGIN))
     src_slider = widgets.Slider(rax, data.src_coll.get_label(), 0, 2, 1)
     src_slider.on_changed(src_changed(data, numpy.array(SOURCE_SLIDER_ORG)))
 
-    # Slider to move target points
-    rax = pyplot.axes([0.35, 0.02, 0.5, 0.04])
+    # Slider to move target points (slider 2)
+    rect = [AX_BTN_WIDTH, 0 * AX_BTN_HEIGHT / AX_NUM_SLIDERS,
+            1 - AX_BTN_WIDTH, AX_BTN_HEIGHT / AX_NUM_SLIDERS]
+    rax = pyplot.axes(deflate_rect(rect, AX_TEXT_WIDTH + AX_MARGIN))
     tgt_slider = widgets.Slider(rax, data.tgt_coll.get_label(), -2, 2, 0)
     tgt_slider.on_changed(tgt_changed(data, numpy.array(TARGET_SLIDER_DIR)))
 
-    set_axes_equal(ax)
 
     ax.legend()
     pyplot.show()
