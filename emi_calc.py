@@ -29,23 +29,21 @@ def calc_emi(pt, line, coef=1):
     # Use integral calculator https://www.integral-calculator.com/ (substitute l with x):
     #   int[ R/sqrt(x^2 + R^2)^3 dx ] = x / (R * sqrt(x^2 + R^2)) + C
     delta = line[1] - line[0]
-    len2 = delta.dot(delta)
-    if not len2:
+    delta_len2 = delta.dot(delta)
+    if not delta_len2:
         return emi_params   # Zero length, return zero EMI params
 
-    # Normalized vector between start and end, useful for subsequent calculations
-    delta_n = delta / numpy.sqrt(len2)
-
-    # The '-' is to base the vector at the origin, instead of at line[0]
-    l0 = -delta_n.dot(delta_n.dot(r0))
+    # Vector projections of "r0" and "r1" in the direction of "delta"
+    # The '-' is to set the origin at the projected point, instead of at line[0]
+    l0 = -delta.dot(delta.dot(r0) / delta_len2)
     l1 = l0 + delta
     R = l0 + r0
 
     #
     # Integral at the start of interval
     #
-    # |l0 x r0| = |l0|.|R|
-    vect0 = numpy.cross(l0, r0)
+    # Start with l0 x R to get a direction vector with length of |l0|.|R|
+    vect0 = numpy.cross(l0, R)
 
     # Divide by 'r0'
     divider = numpy.sqrt(r0.dot(r0))
@@ -56,8 +54,8 @@ def calc_emi(pt, line, coef=1):
     #
     # Integral at the end of interval
     #
-    # |l1 x r1| = |l1|.|R|
-    vect1 = numpy.cross(l1, r1)
+    # Start with l1 x R to get a direction vector with length of |l1|.|R|
+    vect1 = numpy.cross(l1, R)
 
     # Divide by 'r1'
     divider = numpy.sqrt(r1.dot(r1))
@@ -68,7 +66,8 @@ def calc_emi(pt, line, coef=1):
     #
     # Combine both integrals
     #
-    # Divide by 'R^2'
+    # Divide result by 'R^2', resulting:
+    # |l|.|R| / |r| / |R|^2 = |l| / (|R|.|r|)
     divider = R.dot(R)
     if not divider:
         return None     # Target point lies on the "line"
@@ -85,7 +84,7 @@ def calc_emi(pt, line, coef=1):
     #   The sum of B-s is NOT perpendicular to the sum of their perpendiculars. Thus, the direction
     # of "movement" of the summary B can not be calculated from itself. These vectors must be
     # summed separately.
-    emi_params[1] = numpy.cross(B, delta_n)
+    emi_params[1] = numpy.cross(B, delta / numpy.sqrt(delta_len2))
     return emi_params
 
 def calc_all_emis(tgt_pts, src_lines):
