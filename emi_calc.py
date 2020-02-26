@@ -10,8 +10,8 @@ def calc_emi(pt, line, coef=1):
     a line segment.
 
     Returns: [
-            <B-vect>,   # Magnetic field at the point
-            <dB-vect>,  # The direction where this field would shift, because of a unit current increase
+            <B-vect>,       # Magnetic field vector at the point
+            <gradB-vect>,   # Gradient vector of the magnetic field (calculated from the magnitude)
         ]
     """
     emi_params = numpy.zeros((2, pt.shape[0]), dtype=numpy.float64)
@@ -46,10 +46,10 @@ def calc_emi(pt, line, coef=1):
     vect0 = numpy.cross(l0, R)
 
     # Divide by 'r0'
-    divider = numpy.sqrt(r0.dot(r0))
-    if not divider:
+    r0_len = numpy.sqrt(r0.dot(r0))
+    if not r0_len:
         return None     # Target point coincides with "line[0]"
-    vect0 /= divider
+    vect0 /= r0_len
 
     #
     # Integral at the end of interval
@@ -58,21 +58,21 @@ def calc_emi(pt, line, coef=1):
     vect1 = numpy.cross(l1, R)
 
     # Divide by 'r1'
-    divider = numpy.sqrt(r1.dot(r1))
-    if not divider:
+    r1_len = numpy.sqrt(r1.dot(r1))
+    if not r1_len:
         return None     # Target point coincides with "line[1]"
-    vect1 /= divider
+    vect1 /= r1_len
 
     #
     # Combine both integrals
     #
     # Divide result by 'R^2', resulting:
     # |l|.|R| / |r| / |R|^2 = |l| / (|R|.|r|)
-    divider = R.dot(R)
-    if not divider:
+    R_len2 = R.dot(R)
+    if not R_len2:
         return None     # Target point lies on the "line"
 
-    B = (vect1 - vect0) / divider
+    B = (vect1 - vect0) / R_len2
 
     # Scale by a coefficient, like current or magnetic constant
     B *= coef
@@ -93,13 +93,23 @@ def calc_all_emis(tgt_pts, src_lines):
     Requirements:
         tgt_pts and src_lines must be numpy.array
     Returns: {
-            'pt': <pt-vect>,    # Point from tgt_pts, where the field is calculated
-            'B': <B-vect>,      # Magnetic field vector
-            'dB': <dB-vect>     # Direction of magnetic field shift, if the current increases
+            'pt': <pt-vect>,        # Point from tgt_pts, where the field is calculated
+            'B': <B-vect>,          # Magnetic field vector
+            'gradB': <gradB-vect>   # Gradient of the magnetic field magnitude
         }
     """
-    emi_params = []
-    for pt in tgt_pts:
+    # The result is of the same shape as tgt_pts, but the last dimention is moved into 'pt' field
+    emi_pars_dt = numpy.dtype([
+        ('pt', tgt_pts.dtype, (3,)),
+        ('B', tgt_pts.dtype, (3,)),
+        ('gradB', tgt_pts.dtype, (3,)),
+        ])
+    emi_params = numpy.empty(tgt_pts.shape[:-1], emi_pars_dt)
+
+    emi_it = numpy.nditer(emi_params, flags=['multi_index'], op_flags=[['writeonly']])
+    while not emi_it.finished:
+        pt = tgt_pts[emi_it.multi_index]
+
         emi_pars = None
         for idx in range(len(src_lines) - 1):
             emi = calc_emi(pt, src_lines[idx:idx+2])
@@ -108,6 +118,10 @@ def calc_all_emis(tgt_pts, src_lines):
                     emi_pars = emi
                 else:
                     emi_pars += emi
-        if emi_pars is not None:
-            emi_params.append({'pt': pt, 'B': emi_pars[0], 'dB': emi_pars[1]})
+
+        emi_it[0]['pt'] = pt
+        emi_it[0]['B'] = emi_pars[0] if emi_pars is not None else None
+        emi_it[0]['gradB'] = emi_pars[1] if emi_pars is not None else None
+        emi_it.iternext()
+
     return emi_params

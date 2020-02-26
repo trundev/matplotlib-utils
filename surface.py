@@ -86,7 +86,7 @@ else:
     for emi in emi_params:
         b = emi['B']
         B_vecs.append(b)
-        gradB_vecs.append(emi['dB'])
+        gradB_vecs.append(emi['gradB'])
         B_lens.append(np.sqrt(b.dot(b)))
         print('pt',  emi['pt'], 'B', B_lens[-1])
 
