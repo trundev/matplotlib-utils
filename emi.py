@@ -156,7 +156,7 @@ class main_data:
 
         # The EMF induced because of field change
         if EMF_FMT:
-            emf = numpy.cross(emi_params['B'], emi_params['gradB'])
+            emf = numpy.cross(emi_params['gradB'], emi_params['B'])
             emf = emf.dot(EMF_SCALE).transpose()
             self.emf_coll = replace_collection(self.emf_coll, self.ax.quiver(*pts, *emf, **EMF_FMT))
         return True

@@ -78,13 +78,52 @@ def calc_emi(pt, line, coef=1):
     B *= coef
 
     emi_params[0] = B
-    # The direction of "movement" of B, when the current is increased, use the same magnitude as B
+
+    # Calculate the partial derivatives from Biot–Savart law "R/sqrt(l^2 + R^2)^3" (see above)
+    # along "l" and "R" axes, then integrate each of them along 'l'.
     #
-    # Important:
-    #   The sum of B-s is NOT perpendicular to the sum of their perpendiculars. Thus, the direction
-    # of "movement" of the summary B can not be calculated from itself. These vectors must be
-    # summed separately.
-    emi_params[1] = numpy.cross(B, delta / numpy.sqrt(delta_len2))
+    # The individual gradient vector components are the values of these integrals. The 'l'
+    # component is along the 'line' direction and 'R' component is to the direction of its
+    # perpendicular through 'pt'.
+
+    # Gradient component along 'l' (substitute l with x):
+    #   int[ dF(x)/dx dx] = F(x) => gradBx = R/sqrt(x^2 + R^2)^3 - R/sqrt(x^2 + R^2)^3 + C
+    # Finally:
+    #   R / (r1^3 - r0^3)
+    R_len = numpy.sqrt(R_len2)
+
+    l_comp = R_len * ( 1 / r1_len ** 3 - 1 / r0_len ** 3)
+    # Make it vector along 'l'
+    l_comp *= delta / numpy.sqrt(delta_len2)
+
+    # Gradient component along 'R':
+    # Use derivative calculator https://www.derivative-calculator.net/ (substitute R with x):
+    #   input: x / sqrt(x^2 + l^2)^3, result: - (2x^2 - l^2) / (x^2 + l^2)^(5/2)
+    # Substitute back x to R, then l with x:
+    #   result: (x^2 - 2R^2) / sqrt(x^2 + R^2)^5
+    # Use integral calculator https://www.integral-calculator.com/ (back R and x):
+    #   input: (x^2 - 2R^2) / sqrt(x^2 + R^2)^5, result: - (x^3 + 2xR^2) / ( R^2(x^2 + R^2)^(3/2) ) + C
+    # Simplify (substitute back x to l):
+    #   - (l^3 + 2*l*R^2) / ( R^2(l^2 + R^2)^(3/2) ) = - l(l^2 + R^2 + R^2) / ( R^2 * r^3 ) = 
+    #   = - l(r^2 + R^2) / ( R^2 * r^3 )
+    # Finally:
+    #   - l1(r1^2 + R^2) / ( R^2 * r1^3 ) + l1(r1^2 + R^2) / ( R^2 * r0^3 )
+    l0_len = numpy.sqrt(l0.dot(l0))
+    if l0.dot(delta) < 0:
+        l0_len = -l0_len
+    l1_len = numpy.sqrt(l1.dot(l1))
+    if l1.dot(delta) < 0:
+        l1_len = -l1_len
+
+    R_comp = -l1_len*(r1_len ** 2 + R_len2) / (R_len2 * r1_len ** 3)
+    R_comp -= -l0_len*(r0_len ** 2 + R_len2) / (R_len2 * r0_len ** 3)
+    # Make it vector along 'l'
+    R_comp *= R / R_len
+
+    # The '-' is to flip direction to point toward field magnitude increase
+    gradB = -l_comp + R_comp
+    emi_params[1] = gradB 
+
     return emi_params
 
 def calc_all_emis(tgt_pts, src_lines):
