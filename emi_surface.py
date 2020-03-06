@@ -18,12 +18,12 @@ SRC_Z_STEP = 0  # 0.01
 SOURCE_POLYLINE = [
    [0., 0., 0 * SRC_Z_STEP],
    [1., 0., 1 * SRC_Z_STEP],    # right
-#   [1., 1., 2 * SRC_Z_STEP],    # up
-#   [0., 1., 3 * SRC_Z_STEP],    # left
-#   [0., 0., 4 * SRC_Z_STEP],    # down
+   [1., 1., 2 * SRC_Z_STEP],    # up
+   [0., 1., 3 * SRC_Z_STEP],    # left
+   [0., 0., 4 * SRC_Z_STEP],    # down
 ]
 
-BASE_POINT = [0.5, -2., 1.]
+BASE_POINT = [0.5, -.1, .0]
 
 #
 # From emi.py
@@ -31,7 +31,7 @@ BASE_POINT = [0.5, -2., 1.]
 SOURCE_FMT = dict(color='green', label='Source')
 TARGET_FMT = dict(color='blue', marker='+', label='Target')
 B_FMT = dict(color='magenta', linestyle='--', label='Field')
-gradB_FMT = dict(color='yellow', linestyle=':', label='Field gradient')
+gradB_FMT = dict(color='yellow', linestyle=':', label='Gradient')
 
 def plot_source(ax, src_lines):
     src_lines = src_lines.transpose()
@@ -41,6 +41,8 @@ def plot_source(ax, src_lines):
 #
 gradB_FMT['linestyle']='-'
 FAIL_FMT = dict(color='red', marker='o', label='Failure')
+WARNING_FMT = dict(color='orange', marker='o', label='Warning')
+SURFACE_FMT = dict(cmap='viridis', edgecolor='none', alpha=.5)
 
 #
 # Equipotential surface approximation
@@ -52,19 +54,17 @@ def step_along(pt, vect, center, coef):
 def equipotential_surface(base_pt, src_lines, tolerance=.01):
     base_params = emi_calc.calc_all_emis(base_pt, src_lines)
     surface = numpy.full((V_MAX, U_MAX), numpy.nan, dtype=base_params.dtype)
+    info = numpy.zeros(surface.shape, dtype=[('iter', numpy.int)])
     base_B = base_params['B']
     base_B_len = numpy.sqrt(base_B.dot(base_B))
 
     # Step parameters
     center_pt = src_lines.sum(0) / src_lines.shape[0]
     revolution = 2 * numpy.pi
-    tan_phi = numpy.tan(revolution / 2 / U_MAX)
-    tan_psi = numpy.tan(revolution / 4 / V_MAX)
+    tan_phi = numpy.tan(revolution / 3 / U_MAX)
+    tan_psi = numpy.tan(revolution / 3 / V_MAX)
 
     # Iterate along direction of "gradB x B" (v)
-    failed_pts = 0
-    max_iter = -1
-    max_iter_u_v = None
     pt = base_params['pt']
     v = 0
     while v < V_MAX:
@@ -75,6 +75,7 @@ def equipotential_surface(base_pt, src_lines, tolerance=.01):
             print('Point', (u, v))
             # Step along direction of "gradB" to find the exact location
             fail = True
+            info[v, u]['iter'] = 0
             for iter in range(MAX_ITERATIONS):
                 emi_params = emi_calc.calc_all_emis(pt, src_lines)
                 B = emi_params['B']
@@ -83,6 +84,7 @@ def equipotential_surface(base_pt, src_lines, tolerance=.01):
                 dB = base_B_len - B_len
                 if abs(dB) < tolerance * base_B_len:
                     surface[v, u] = emi_params
+                    info[v, u]['iter'] = iter + 1
                     fail = False
                     break
 
@@ -92,11 +94,7 @@ def equipotential_surface(base_pt, src_lines, tolerance=.01):
 
             if fail:
                 print('Error: Unable to find B', B, ' around', pt, file=sys.stderr)
-                failed_pts += 1
                 surface[v, u]['pt'] = pt
-            elif max_iter < iter:
-                max_iter = iter
-                max_iter_u_v = u,v
 
             # Keep the first "u" point location for the next "v" iteration
             if base_params is None:
@@ -112,8 +110,12 @@ def equipotential_surface(base_pt, src_lines, tolerance=.01):
         pt = step_along(pt, numpy.cross(base_params['gradB'], base_params['B']), center_pt, tan_psi)
         v += 1
 
-    print('Max iterations', max_iter, 'at', max_iter_u_v, ',', failed_pts, 'failed')
-    return surface
+    iters = info['iter']
+    failed_pts = numpy.count_nonzero(iters == 0)
+    max_idx = numpy.array((iters >= iters.max()).nonzero())
+    max_idx = max_idx.transpose()
+    print('Max iterations', iters.max(), 'at:', max_idx, ',', failed_pts, 'failed')
+    return surface, info
 
 #
 # Utilities
@@ -147,7 +149,7 @@ def check_result(src_lines, surface):
     B_vec_lens = vect_lens(B_vecs)
     B_vec_lens, nans = strip_nans(B_vec_lens)
     print('    Lengths (mean/max/min/std):', B_vec_lens.mean(), B_vec_lens.max(), B_vec_lens.min(), B_vec_lens.std(), ',', nans, 'nans')
-    if B_vec_lens.std() > 1e-3:
+    if B_vec_lens.std() > 5e-2:
         print('Warning: Standard deviation is too big:', B_vec_lens.std(), file=sys.stderr)
 
     print('  Recalculate B vectors')
@@ -189,7 +191,7 @@ def main(base_pt, src_lines):
     fig = pyplot.figure()
     ax = fig.gca(projection='3d')
 
-    surface = equipotential_surface(base_pt, src_lines)
+    surface, info = equipotential_surface(base_pt, src_lines)
 
     # Re-check results
     if True:
@@ -204,18 +206,37 @@ def main(base_pt, src_lines):
     gradB_vecs = surface['gradB']
 
     # Identify failed points
-    pts_fails = numpy.full_like(pts, numpy.nan)
-    numpy.copyto(pts_fails, pts, where=numpy.isnan(B_vecs))
+    pts_fails = numpy.where(numpy.isnan(B_vecs), pts, numpy.nan)
     ax.scatter(*pts_fails.transpose(), **FAIL_FMT)
+
+    # Identify the points, where approximation takes more iterations
+    median = int(numpy.median(info['iter']))
+    print('"Warning" marker is where iterations are more than', median)
+    where = info['iter'] > median
+    where = numpy.stack(pts.shape[-1]*[where], axis=-1)
+    pts_warns = numpy.where(where, pts, numpy.nan)
+    ax.scatter(*pts_warns.transpose(), **WARNING_FMT)
+
+    # Resize B and grad B to fit screen (ignore NaN-s)
+    src_max = vect_lens(src_lines.max(0) - src_lines.min(0))
+    B_max = numpy.nanmax(vect_lens(B_vecs))
+    gradB_max = numpy.nanmax(vect_lens(gradB_vecs))
+    # Scale field vectors to 1/20 of source lines
+    B_scale = src_max / B_max / 20
+    gradB_scale = src_max / gradB_max / 20
+    print('Rescale B to %.3f and gradB to %f'%(B_scale, gradB_scale))
+    B_vecs *= B_scale
+    gradB_vecs *= gradB_scale
 
     pts = pts.transpose()
     B_vecs = B_vecs.transpose()
     gradB_vecs = gradB_vecs.transpose()
     ax.quiver(*pts, *B_vecs, **B_FMT)
     ax.quiver(*pts, *gradB_vecs, **gradB_FMT)
-    ax.plot_surface(*pts, cmap='viridis', edgecolor='none', alpha=.75)
+    ax.plot_surface(*pts, **SURFACE_FMT)
 
     ax.set_title('Equipotential surface')
+    ax.legend()
     pyplot.show()
     return 0
 
