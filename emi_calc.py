@@ -89,7 +89,7 @@ def calc_emi(pt, line, coef=1):
     # Gradient component along 'l' (substitute l with x):
     #   int[ dF(x)/dx dx] = F(x) => gradBx = R/sqrt(x^2 + R^2)^3 - R/sqrt(x^2 + R^2)^3 + C
     # Finally:
-    #   R / (r1^3 - r0^3)
+    #   R * (1/r1^3 - 1/r0^3)
     R_len = numpy.sqrt(R_len2)
 
     l_comp = R_len * ( 1 / r1_len ** 3 - 1 / r0_len ** 3)
@@ -137,30 +137,34 @@ def calc_all_emis(tgt_pts, src_lines):
             'gradB': <gradB-vect>   # Gradient of the magnetic field magnitude
         }
     """
-    # The result is of the same shape as tgt_pts, but the last dimention is moved into 'pt' field
-    emi_pars_dt = numpy.dtype([
-        ('pt', tgt_pts.dtype, (3,)),
-        ('B', tgt_pts.dtype, (3,)),
-        ('gradB', tgt_pts.dtype, (3,)),
-        ])
-    emi_params = numpy.empty(tgt_pts.shape[:-1], emi_pars_dt)
+    if not tgt_pts.dtype.fields:
+        # Option 1: tgt_pts contains points
+        # The result is of the same shape as tgt_pts, but the last dimention is moved into 'pt' field
+        emi_pars_dt = numpy.dtype([
+            ('pt', tgt_pts.dtype, (3,)),
+            ('B', tgt_pts.dtype, (3,)),
+            ('gradB', tgt_pts.dtype, (3,)),
+            ])
+        emi_params = numpy.empty(tgt_pts.shape[:-1], emi_pars_dt)
+        emi_params['pt'] = tgt_pts
+        emi_params['B'] = numpy.nan
+        emi_params['gradB'] = numpy.nan
+    else:
+        # Option 2: tgt_pts contains EMI params structure
+        # The result is added to existing field (superposition principle)
+        emi_params = tgt_pts
 
-    emi_it = numpy.nditer(emi_params, flags=['multi_index'], op_flags=[['writeonly']])
-    while not emi_it.finished:
-        pt = tgt_pts[emi_it.multi_index]
-
-        emi_pars = None
-        for idx in range(len(src_lines) - 1):
-            emi = calc_emi(pt, src_lines[idx:idx+2])
+    emi_it = numpy.nditer(emi_params, op_flags=[['readwrite']])
+    for emi_pars in emi_it:
+        for idx, _ in enumerate(src_lines[:-1]):
+            emi = calc_emi(emi_pars['pt'], src_lines[idx:idx+2])
             if emi is not None:     # Ignore point collinear to the src-line
-                if emi_pars is None:
-                    emi_pars = emi
-                else:
-                    emi_pars += emi
+                if numpy.isnan(emi_pars['B']).all():
+                    emi_pars['B'] = 0
+                if numpy.isnan(emi_pars['gradB']).all():
+                    emi_pars['gradB'] = 0
 
-        emi_it[0]['pt'] = pt
-        emi_it[0]['B'] = emi_pars[0] if emi_pars is not None else None
-        emi_it[0]['gradB'] = emi_pars[1] if emi_pars is not None else None
-        emi_it.iternext()
+                emi_pars['B'] += emi[0]
+                emi_pars['gradB'] += emi[1]
 
     return emi_params
