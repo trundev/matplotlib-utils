@@ -5,6 +5,72 @@ Requires: numpy
 import sys
 import numpy
 
+def calc_emi_dif(tgt_pt, src_pt, src_dir):
+    """Calculate the magnetic field at specific point, induced by movement of a charged particle.
+
+    Returns: [
+            <B-vect>,       # Magnetic field vector at the point
+            <gradB-vect>,   # Gradient vector of the magnetic field (calculated from the magnitude)
+        ]
+    """
+    emi_params = numpy.zeros((2, tgt_pt.shape[0]), dtype=numpy.float64)
+
+    # 'r' vector
+    r = tgt_pt - src_pt
+
+    src_dir_len2 = src_dir.dot(src_dir)
+    if not src_dir_len2:
+        return emi_params   # Zero length, return zero EMI params
+
+    # Vector projections of "r" in the direction of "src_dir"
+    l = src_dir.dot(src_dir.dot(r) / src_dir_len2)
+    R = r - l
+
+    r_len = numpy.sqrt(r.dot(r))
+    if not r_len:
+        return None     # Target point coincides with "src_pt"
+
+    # Calculate the differential Biot–Savart law (https://en.wikipedia.org/wiki/Biot–Savart_law):
+    # dl x r / r^3
+    B = numpy.cross(src_dir, r) / r_len ** 3
+
+    emi_params[0] = B
+
+    # Calculate the partial derivatives from Biot–Savart law "R/sqrt(l^2 + R^2)^3" (see calc_emi())
+    # along "l" and "R" axes, then integrate each of them along 'l'.
+
+    # Gradient component along 'l':
+    # Use derivative calculator https://www.derivative-calculator.net/ (substitute l with x):
+    #   input: R / sqrt(x^2 + R^2)^3, result: -3Rx / (x^2 + R^2)^(5/2)
+    # Substitute back x to l, then sqrt(l^2 + R^2) to r:
+    #   result: -3 * R * l / r^5
+    R_len2 = R.dot(R)
+    l_len2 = l.dot(l)
+    R_len = numpy.sqrt(R_len2)
+    l_len = numpy.sqrt(l_len2)
+    if l.dot(src_dir) < 0:
+        l_len = -l_len
+
+    l_comp = -3 * R_len * l_len / r_len ** 5
+    # Make it vector along 'l'
+    l_comp *= src_dir / numpy.sqrt(src_dir_len2)
+
+    # Gradient component along 'R':
+    # Use derivative calculator https://www.derivative-calculator.net/ (substitute R with x):
+    #   input: x / sqrt(x^2 + l^2)^3, result: - (2x^2 - l^2) / (x^2 + l^2)^(5/2)
+    # Substitute back x to R, then sqrt(l^2 + R^2) to r:
+    #   result: (l^2 - 2R^2) / r^5
+
+    R_comp = (l_len2 - 2 * R_len2) / r_len ** 5
+    # Make it vector along 'l'
+    R_comp *= R / R_len
+
+    # Combine 'l' and 'R' components
+    gradB = l_comp + R_comp
+    emi_params[1] = gradB 
+
+    return emi_params
+
 def calc_emi(pt, line, coef=1):
     """Calculate the magnetic field at specific point, induced by electric current flowing along
     a line segment.
