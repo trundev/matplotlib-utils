@@ -71,7 +71,7 @@ def calc_emi_dif(tgt_pt, src_pt, src_dir):
 
     return emi_params
 
-def calc_emi(pt, line, coef=1):
+def calc_emi(tgt_pt, src_pt, src_dir, coef=1):
     """Calculate the magnetic field at specific point, induced by electric current flowing along
     a line segment.
 
@@ -80,11 +80,11 @@ def calc_emi(pt, line, coef=1):
             <gradB-vect>,   # Gradient vector of the magnetic field (calculated from the magnitude)
         ]
     """
-    emi_params = numpy.zeros((2, pt.shape[0]), dtype=numpy.float64)
+    emi_params = numpy.zeros((2, tgt_pt.shape[0]), dtype=numpy.float64)
 
     # Start and end 'r' vectors
-    r0 = pt - line[0]
-    r1 = pt - line[1]
+    r0 = tgt_pt - src_pt
+    r1 = r0 - src_dir
 
     # Calculate the integral from Biot–Savart law (https://en.wikipedia.org/wiki/Biot–Savart_law):
     #   dl x r / sqrt(l^2 + R^2)^3
@@ -94,15 +94,14 @@ def calc_emi(pt, line, coef=1):
     #
     # Use integral calculator https://www.integral-calculator.com/ (substitute l with x):
     #   int[ R/sqrt(x^2 + R^2)^3 dx ] = x / (R * sqrt(x^2 + R^2)) + C
-    delta = line[1] - line[0]
-    delta_len2 = delta.dot(delta)
-    if not delta_len2:
+    src_dir_len2 = src_dir.dot(src_dir)
+    if not src_dir_len2:
         return emi_params   # Zero length, return zero EMI params
 
-    # Vector projections of "r0" and "r1" in the direction of "delta"
-    # The '-' is to set the origin at the projected point, instead of at line[0]
-    l0 = -delta.dot(delta.dot(r0) / delta_len2)
-    l1 = l0 + delta
+    # Vector projections of "r0" and "r1" in the direction of "src_dir"
+    # The '-' is to set the origin at the projected point, instead of at src_pt
+    l0 = -src_dir.dot(src_dir.dot(r0) / src_dir_len2)
+    l1 = l0 + src_dir
     R = l0 + r0
 
     #
@@ -114,7 +113,7 @@ def calc_emi(pt, line, coef=1):
     # Divide by 'r0'
     r0_len = numpy.sqrt(r0.dot(r0))
     if not r0_len:
-        return None     # Target point coincides with "line[0]"
+        return None     # Target point coincides with "src_pt"
     vect0 /= r0_len
 
     #
@@ -126,7 +125,7 @@ def calc_emi(pt, line, coef=1):
     # Divide by 'r1'
     r1_len = numpy.sqrt(r1.dot(r1))
     if not r1_len:
-        return None     # Target point coincides with "line[1]"
+        return None     # Target point coincides with "src_pt + src_dir"
     vect1 /= r1_len
 
     #
@@ -136,7 +135,7 @@ def calc_emi(pt, line, coef=1):
     # |l|.|R| / |r| / |R|^2 = |l| / (|R|.|r|)
     R_len2 = R.dot(R)
     if not R_len2:
-        return None     # Target point lies on the "line"
+        return None     # Target point lies on the source line
 
     B = (vect1 - vect0) / R_len2
 
@@ -149,8 +148,8 @@ def calc_emi(pt, line, coef=1):
     # along "l" and "R" axes, then integrate each of them along 'l'.
     #
     # The individual gradient vector components are the values of these integrals. The 'l'
-    # component is along the 'line' direction and 'R' component is to the direction of its
-    # perpendicular through 'pt'.
+    # component is along the 'src_dir' direction and 'R' component is to the direction of its
+    # perpendicular through 'tgt_pt'.
 
     # Gradient component along 'l' (substitute l with x):
     #   int[ dF(x)/dx dx] = F(x) => gradBx = R/sqrt(x^2 + R^2)^3 - R/sqrt(x^2 + R^2)^3 + C
@@ -160,7 +159,7 @@ def calc_emi(pt, line, coef=1):
 
     l_comp = R_len * ( 1 / r1_len ** 3 - 1 / r0_len ** 3)
     # Make it vector along 'l'
-    l_comp *= delta / numpy.sqrt(delta_len2)
+    l_comp *= src_dir / numpy.sqrt(src_dir_len2)
 
     # Gradient component along 'R':
     # Use derivative calculator https://www.derivative-calculator.net/ (substitute R with x):
@@ -175,10 +174,10 @@ def calc_emi(pt, line, coef=1):
     # Finally:
     #   - l1(r1^2 + R^2) / ( R^2 * r1^3 ) + l1(r1^2 + R^2) / ( R^2 * r0^3 )
     l0_len = numpy.sqrt(l0.dot(l0))
-    if l0.dot(delta) < 0:
+    if l0.dot(src_dir) < 0:
         l0_len = -l0_len
     l1_len = numpy.sqrt(l1.dot(l1))
-    if l1.dot(delta) < 0:
+    if l1.dot(src_dir) < 0:
         l1_len = -l1_len
 
     R_comp = -l1_len*(r1_len ** 2 + R_len2) / (R_len2 * r1_len ** 3)
@@ -220,10 +219,16 @@ def calc_all_emis(tgt_pts, src_lines):
         # The result is added to existing field (superposition principle)
         emi_params = tgt_pts
 
+    # Allow multiple source lines
+    src_pts = src_lines[...,:-1,:]
+    src_dirs = src_lines[...,1:,:] - src_lines[...,:-1,:]
+    src_pts = src_pts.reshape((-1, src_pts.shape[-1]))
+    src_dirs = src_dirs.reshape((-1, src_dirs.shape[-1]))
+
     emi_it = numpy.nditer(emi_params, op_flags=[['readwrite']])
     for emi_pars in emi_it:
-        for idx, _ in enumerate(src_lines[:-1]):
-            emi = calc_emi(emi_pars['pt'], src_lines[idx:idx+2])
+        for src_pt, src_dir in zip(src_pts, src_dirs):
+            emi = calc_emi(emi_pars['pt'], src_pt, src_dir)
             if emi is not None:     # Ignore point collinear to the src-line
                 if numpy.isnan(emi_pars['B']).all():
                     emi_pars['B'] = 0

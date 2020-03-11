@@ -34,8 +34,9 @@ B_FMT = dict(color='magenta', linestyle='--', label='Field')
 gradB_FMT = dict(color='yellow', linestyle=':', label='Gradient')
 
 def plot_source(ax, src_lines):
-    src_lines = src_lines.transpose()
-    return ax.quiver(*src_lines[:,:-1], *(src_lines[:,1:] - src_lines[:,:-1]), **SOURCE_FMT)
+    src_pts = src_lines[...,:-1,:]
+    src_dirs = src_lines[...,1:,:] - src_lines[...,:-1,:]
+    return ax.quiver(*src_pts.transpose(), *src_dirs.transpose(), **SOURCE_FMT)
 #
 # End of emi.py
 #

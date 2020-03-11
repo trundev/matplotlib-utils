@@ -91,9 +91,9 @@ def set_axes_equal(ax):
     set_axes_radius(ax, origin, radius)
 
 def plot_source(ax, src_lines):
-    src_lines = src_lines.transpose()
-    ##ax.plot(*src_lines.transpose(), **SOURCE_FMT)
-    return ax.quiver(*src_lines[:,:-1], *(src_lines[:,1:] - src_lines[:,:-1]), **SOURCE_FMT)
+    src_pts = src_lines[...,:-1,:]
+    src_dirs = src_lines[...,1:,:] - src_lines[...,:-1,:]
+    return ax.quiver(*src_pts.transpose(), *src_dirs.transpose(), **SOURCE_FMT)
 
 def replace_collection(old, new):
     """Replace collection by keeping its visibility"""
