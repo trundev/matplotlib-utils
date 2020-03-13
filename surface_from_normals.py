@@ -34,19 +34,45 @@ SURFACE_FMT = dict(cmap='viridis', edgecolor='none', alpha=.5)
 
 #
 # Utilities
+# The functions support numpy array of vectors with the x,y,z in the last dimension
 #
 def vect_dot(v0, v1):
-    """Dot product of vectors from a numpy array (x,y,z in the last dimension)"""
+    """Dot product of vectors by vectors in a numpy arrays"""
     return (v0 * v1).sum(-1)
 
 def vect_lens(v):
-    """Length of vectors in a numpy array (x,y,z in the last dimension)"""
+    """Length of vectors in a numpy array"""
     return numpy.sqrt(vect_dot(v, v))
-    
-def make_unit_vects(vects):
-    """Make lengths of vector in a numpy array equal to 1 (x,y,z in the last dimension)"""
-    vects.T[:] /= vect_lens(vects).T
-    return vects
+
+def vect_scale(vects, scale):
+    """Dot product of vectors and scalars in a numpy arrays"""
+    return (vects.T[:] * scale.T).T
+
+def unit_vects(vects):
+    """Get unit vectors in a numpy array"""
+    return vect_scale(vects, 1 / vect_lens(vects))
+
+def intersect_vects(vects, points0, points1):
+    """Intersection between vector and line between two points"""
+    if True:    # Optimization
+        # Optimize out the cross product and square root (meaningful in 3D scenarios only):
+        # Scale = |AxB|^2 / [(AxB).(AxC) + (AxB).(CxB)] =
+        # = (|A|^2|B|^2 - |A.B|^2) / (A - B).[A(B.C) - B(A.C)] =
+        # = (|A|^2|B|^2 - |A.B|^2) / [(|A|^2 - A.B)(B.C) - (A.B - |B|^2)(A.C)]
+        a_2 = vect_dot(points0, points0)
+        b_2 = vect_dot(points1, points1)
+        a_dot_b = vect_dot(points0, points1)
+        a_dot_c = vect_dot(points0, vects)
+        b_dot_c = vect_dot(points1, vects)
+        scale = a_2 * b_2 - a_dot_b * a_dot_b
+        scale /= (a_2 - a_dot_b) * b_dot_c - (a_dot_b - b_2) * a_dot_c
+    else:
+        # Scale = |AxB| / (|AxC + CxB|)
+        def _len(v):
+            # With 2D vectors numpy.cross() returns scalar
+            return vect_lens(v) if v.shape else v
+        scale = _len(numpy.cross(points0, points1)) / _len(numpy.cross(points0, vects) + numpy.cross(vects, points1))
+    return vect_scale(vects, scale)
 
 def plot_source(ax, src_lines):
     src_pts = src_lines[...,:-1,:]
@@ -62,8 +88,8 @@ def surface_from_normals(normal_fn, base_pt, *params):
         normal, tangent = normal_fn(pt, *params)
         out['pt'] = pt
         # Ensure tangent is perpendicular to normal
-        out['norm'] = make_unit_vects(normal)
-        out['tang'] = make_unit_vects(numpy.cross(numpy.cross(normal, tangent), normal))
+        out['norm'] = unit_vects(normal)
+        out['tang'] = unit_vects(numpy.cross(numpy.cross(normal, tangent), normal))
         return
 
     data_dtype=[
@@ -80,19 +106,20 @@ def surface_from_normals(normal_fn, base_pt, *params):
             # Temporarily move axis to be processed at front
             surface = numpy.moveaxis(surface, axis, 0)
 
-            new_pts = numpy.full((1, *surface.shape[1:]), numpy.nan, dtype=surface.dtype)
+            new_pts = numpy.full(surface.shape[1:], numpy.nan, dtype=surface.dtype)
 
             base_pts = surface[idx]
             tangents = base_pts['tang']
             if axis > 0:
                 # Use bi-tangent
-                tangents = make_unit_vects(numpy.cross(base_pts['norm'], tangents))
+                tangents = unit_vects(numpy.cross(base_pts['norm'], tangents))
             if idx < 0:
                 tangents = -tangents
 
             tangents *= STEP_SCALE  # TODO: Use proper step
             wrap_normal_fn(new_pts, base_pts['pt'] + tangents)
 
+            new_pts = numpy.expand_dims(new_pts, 0)
             if idx < 0:
                 surface = numpy.concatenate((surface, new_pts))
             else:
