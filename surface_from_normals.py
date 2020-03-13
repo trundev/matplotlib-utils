@@ -46,7 +46,7 @@ def vect_lens(v):
 
 def vect_scale(vects, scale):
     """Dot product of vectors and scalars in a numpy arrays"""
-    return (vects.T[:] * scale.T).T
+    return vects * scale[..., numpy.newaxis]
 
 def unit_vects(vects):
     """Get unit vectors in a numpy array"""
@@ -82,6 +82,15 @@ def plot_source(ax, src_lines):
 #
 # Surface generation
 #
+def adjust_points(pt, v, pt0, v0):
+    """Adjust pt in order both points to be equidistant from the intersection of vectors"""
+    rel_pt = pt0 - pt
+    v = intersect_vects(v, rel_pt, v0 + rel_pt)
+    # "v": vector p -> intersection
+    # "v - rel_pt": vector p0 -> intersection
+    v = vect_scale(v, 1 - vect_lens(v - rel_pt) / vect_lens(v))
+    return pt + v
+
 def surface_from_normals(normal_fn, base_pt, *params):
     """Generate surface from its normals returned by an arbitrary function"""
     def wrap_normal_fn(out, pt):
@@ -117,7 +126,12 @@ def surface_from_normals(normal_fn, base_pt, *params):
                 tangents = -tangents
 
             tangents *= STEP_SCALE  # TODO: Use proper step
-            wrap_normal_fn(new_pts, base_pts['pt'] + tangents)
+
+            # Iterations to increase the approximation precision
+            pts = base_pts['pt'] + tangents
+            for _ in range(3):
+                wrap_normal_fn(new_pts, pts)
+                pts = adjust_points(pts, new_pts['norm'], base_pts['pt'], base_pts['norm'])
 
             new_pts = numpy.expand_dims(new_pts, 0)
             if idx < 0:
