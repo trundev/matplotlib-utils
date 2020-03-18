@@ -68,7 +68,7 @@ SCALE_PARAMS = [0, 2, 1]
 SOURCE_FMT = dict(color='green', label='Source')
 TARGET_FMT = dict(color='blue', marker='+', label='Target')
 B_FMT = dict(color='magenta', linestyle='--', label='Field')
-dB_FMT = dict(color='yellow', linestyle=':', label='Field change')
+GRADB_FMT = dict(color='yellow', linestyle=':', label='Field gradient')
 EMF_FMT = dict(color='red', linestyle='-.', label='EM Force')
 
 # From https://stackoverflow.com/questions/13685386/matplotlib-equal-unit-length-with-equal-aspect-ratio-z-axis-is-not-equal-to
@@ -97,9 +97,9 @@ def set_axes_equal(ax):
     set_axes_radius(ax, origin, radius)
 
 def plot_source(ax, src_lines):
-    src_lines = src_lines.transpose()
-    ##ax.plot(*src_lines.transpose(), **SOURCE_FMT)
-    return ax.quiver(*src_lines[:,:-1], *(src_lines[:,1:] - src_lines[:,:-1]), **SOURCE_FMT)
+    src_pts = src_lines[...,:-1,:]
+    src_dirs = src_lines[...,1:,:] - src_lines[...,:-1,:]
+    return ax.quiver(*src_pts.transpose(), *src_dirs.transpose(), **SOURCE_FMT)
 
 def replace_collection(old, new):
     """Replace collection by keeping its visibility"""
@@ -161,24 +161,22 @@ class main_data:
         # Calculate EMI parameters B and dB for each target point
         emi_params = emi_calc.calc_all_emis(tgt_pts, src_lines)
 
-        pts = numpy.array([emi_pars['pt'] for emi_pars in emi_params]).transpose()
+        pts = emi_params['pt'].transpose()
 
         # Magnetic field
         if B_FMT:
-            B = [emi_pars['B'].dot(FIELD_SCALE) for emi_pars in emi_params]
-            B = numpy.array(B).transpose()
+            B = emi_params['B'].dot(FIELD_SCALE).transpose()
             self.B_coll = replace_collection(self.B_coll, self.ax.quiver(*pts, *B, **B_FMT))
 
-        # The direction of "movement" of the field because of current increase
-        if dB_FMT:
-            dB = [emi_pars['dB'].dot(FIELD_SCALE) for emi_pars in emi_params]
-            dB = numpy.array(dB).transpose()
-            self.dB_coll = replace_collection(self.dB_coll, self.ax.quiver(*pts, *dB, **dB_FMT))
+        # The field-gradient, i.e. the direction of "movement" of the field because of current increase
+        if GRADB_FMT:
+            dB = emi_params['gradB'].dot(FIELD_SCALE).transpose()
+            self.dB_coll = replace_collection(self.dB_coll, self.ax.quiver(*pts, *dB, **GRADB_FMT))
 
         # The EMF induced because of field change
         if EMF_FMT:
-            emf = [numpy.cross(emi_pars['B'], emi_pars['dB']).dot(EMF_SCALE) for emi_pars in emi_params]
-            emf = numpy.array(emf).transpose()
+            emf = numpy.cross(emi_params['gradB'], emi_params['B'])
+            emf = emf.dot(EMF_SCALE).transpose()
             self.emf_coll = replace_collection(self.emf_coll, self.ax.quiver(*pts, *emf, **EMF_FMT))
         return True
 
