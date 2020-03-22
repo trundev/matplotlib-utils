@@ -24,13 +24,16 @@ SOURCE_POLYLINE = [
 BASE_POINT = [.5, -1, .0]
 
 STEP_SCALE = .25
+# Approximation precision
+APPROX_TOLERANCE = 1e-3
+APPROX_MAX_ITERS = 3
 
 SOURCE_FMT  = dict(color='green', label='Source')
 BASE_PT_FMT = dict(color='black', marker='o', label='Base point')
 TANGENTS_FMT = dict(color='magenta', linestyle='--', label='Tangents')
 NORMALS_FMT = dict(color='blue', linestyle='-', label='Normals')
 POINT_FMT   = {}    #dict(color='magenta', marker='.', label='Points')
-SURFACE_FMT = dict(cmap='viridis', edgecolor='none', alpha=.5)
+SURFACE_FMT = dict(cmap='viridis', edgecolor='none', alpha=.5, label='_Surface')    # Strange crash w/o leading underscore
 
 #
 # Utilities
@@ -72,7 +75,11 @@ def intersect_vects(vects, points0, points1):
             # With 2D vectors numpy.cross() returns scalar
             return vect_lens(v) if v.shape else v
         scale = _len(numpy.cross(points0, points1)) / _len(numpy.cross(points0, vects) + numpy.cross(vects, points1))
-    return vect_scale(vects, scale)
+    res = vect_scale(vects, scale)
+    # Ensure result is 'inf' when the lines are parallel (scale is +infinite)
+    mask = numpy.broadcast_to(numpy.isposinf(scale)[..., numpy.newaxis], res.shape)
+    numpy.place(res, mask, numpy.inf)
+    return res
 
 def plot_source(ax, src_lines):
     src_pts = src_lines[...,:-1,:]
@@ -88,8 +95,10 @@ def adjust_points(pt, v, pt0, v0):
     v = intersect_vects(v, rel_pt, v0 + rel_pt)
     # "v": vector p -> intersection
     # "v - rel_pt": vector p0 -> intersection
-    v = vect_scale(v, 1 - vect_lens(v - rel_pt) / vect_lens(v))
-    return pt + v
+    v_adj = vect_scale(v, 1 - vect_lens(v - rel_pt) / vect_lens(v))
+    # No adjustment when the lines are parallel
+    numpy.place(v_adj, numpy.isposinf(v), 0)
+    return v_adj
 
 def surface_from_normals(normal_fn, base_pt, *params):
     """Generate surface from its normals returned by an arbitrary function"""
@@ -129,9 +138,15 @@ def surface_from_normals(normal_fn, base_pt, *params):
 
             # Iterations to increase the approximation precision
             pts = base_pts['pt'] + tangents
-            for _ in range(3):
+            wrap_normal_fn(new_pts, pts)
+            for _ in range(APPROX_MAX_ITERS):
+                pts_adj = adjust_points(pts, new_pts['norm'], base_pts['pt'], base_pts['norm'])
+                # Abort approximation when all adjustments are negligible
+                adj_max2 = vect_dot(pts_adj, pts_adj).max()
+                if adj_max2 < APPROX_TOLERANCE ** 2:
+                    break
+                pts += pts_adj
                 wrap_normal_fn(new_pts, pts)
-                pts = adjust_points(pts, new_pts['norm'], base_pts['pt'], base_pts['norm'])
 
             new_pts = numpy.expand_dims(new_pts, 0)
             if idx < 0:
