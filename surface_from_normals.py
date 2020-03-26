@@ -6,6 +6,7 @@ must be made of normals of concentric surfaces.
 import sys
 import numpy
 import matplotlib.pyplot as pyplot
+import matplotlib.widgets as widgets
 import mpl_toolkits.mplot3d as mplot3d
 import emi_calc
 
@@ -32,8 +33,15 @@ SOURCE_FMT  = dict(color='green', label='Source')
 BASE_PT_FMT = dict(color='black', marker='o', label='Base point')
 TANGENTS_FMT = dict(color='magenta', linestyle='--', label='Tangents')
 NORMALS_FMT = dict(color='blue', linestyle='-', label='Normals')
-POINT_FMT   = {}    #dict(color='magenta', marker='.', label='Points')
+POINT_FMT   = dict(color='magenta', marker='.', visible=False, label='Points')
 SURFACE_FMT = dict(cmap='viridis', edgecolor='none', alpha=.5, label='_Surface')    # Strange crash w/o leading underscore
+
+AX_MARGIN = .01
+SLIDER_HOR_MARGIN = .1
+BASE_AX_HEIGHT = .2
+BASE_AX_WIDTH = 1
+AX_BTN_HEIGHT = .2
+AX_BTN_WIDTH = .2
 
 #
 # Utilities
@@ -100,7 +108,7 @@ def adjust_points(pt, v, pt0, v0):
     numpy.place(v_adj, numpy.isposinf(v), 0)
     return v_adj
 
-def surface_from_normals(normal_fn, base_pt, *params):
+def surface_from_normals(extent_uv, normal_fn, base_pt, *params):
     """Generate surface from its normals returned by an arbitrary function"""
     def wrap_normal_fn(out, pt):
         normal, tangent = normal_fn(pt, *params)
@@ -119,8 +127,16 @@ def surface_from_normals(normal_fn, base_pt, *params):
 
     wrap_normal_fn(surface[0, 0], base_pt)
 
-    for iter in range(6):
-        for axis, idx in (0, -1), (1, -1), (0, 0), (1, 0):
+    for extent in range(max(extent_uv)):
+        # Select in which directions to expand
+        if extent < extent_uv[0] and extent < extent_uv[1]:
+            axis_idxs = [(0, -1), (1, -1), (0, 0), (1, 0)]
+        elif extent < extent_uv[0]:
+            axis_idxs = [(0, -1), (0, 0)]
+        else:
+            axis_idxs = [(1, -1), (1, 0)]
+
+        for axis, idx in axis_idxs:
             # Temporarily move axis to be processed at front
             surface = numpy.moveaxis(surface, axis, 0)
 
@@ -162,13 +178,15 @@ def surface_from_normals(normal_fn, base_pt, *params):
 #
 # Plot
 #
-def plot_surface(ax, extent, normal_fn, base_pt, *params):
+def plot_surface(ax, extent_uv, extent, normal_fn, base_pt, *params):
     """Plot specific surface"""
+    colls = []
+
     # Base target point
     if BASE_PT_FMT:
-        ax.scatter(*base_pt, **BASE_PT_FMT)
+        colls.append( ax.scatter(*base_pt, **BASE_PT_FMT))
 
-    surface = surface_from_normals(normal_fn, base_pt, *params)
+    surface = surface_from_normals(extent_uv, normal_fn, base_pt, *params)
 
     # Re-obtain selected points
     normals, tangents = normal_fn(surface, *params)
@@ -186,15 +204,89 @@ def plot_surface(ax, extent, normal_fn, base_pt, *params):
     normals *= extent / numpy.nanmax(n_lens) / 8
     tangents *= extent / numpy.nanmax(t_lens) / 8
     if NORMALS_FMT:
-        ax.quiver(*surface.T, *normals.T, **NORMALS_FMT)
+        colls.append( ax.quiver(*surface.T, *normals.T, **NORMALS_FMT))
     if TANGENTS_FMT:
-        ax.quiver(*surface.T, *tangents.T, **TANGENTS_FMT)
+        colls.append( ax.quiver(*surface.T, *tangents.T, **TANGENTS_FMT))
     if POINT_FMT:
-        ax.scatter(*surface.T, **POINT_FMT)
+        colls.append( ax.scatter(*surface.T, **POINT_FMT))
 
     if SURFACE_FMT:
-        ax.plot_surface(*surface.T, **SURFACE_FMT)
-    return
+        colls.append( ax.plot_surface(*surface.T, **SURFACE_FMT))
+    return colls
+
+#
+# Widget utilities
+#
+def deflate_rect(rect, hor_margin=AX_MARGIN, vert_margin=AX_MARGIN):
+    """Deflate matplotlib rectangle [left, bottom, right, top]"""
+    rect[0] += hor_margin
+    rect[1] += vert_margin
+    rect[2] -= 2 * hor_margin
+    rect[3] -= 2 * vert_margin
+    return rect
+
+def split_rect(rect, split_pos=.5, hor_split=False):
+    """Split matplotlib rectangle [left, bottom, right, top]"""
+    rect1 = rect.copy()
+    rect2 = rect.copy()
+    if hor_split:
+        rect1[3] = split_pos
+        rect2[3] -= split_pos
+        rect2[1] += rect1[3]
+    else:
+        rect1[2] = split_pos
+        rect2[2] -= split_pos
+        rect2[0] += rect1[2]
+    return rect1, rect2
+
+class main_class:
+    def __init__(self, ax, colls, plot_cb, *plot_params):
+        self.ax = ax
+        self.colls = colls
+        self.plot_cb = plot_cb
+        self.plot_params = plot_params
+        self.extent_uv = [1, 1]
+
+    def find_collection(self, label):
+        for idx, coll in enumerate(self.colls):
+            if coll.get_label() == label:
+                return coll, idx
+        return None, None
+
+    def replace_collection(self, coll):
+        """Replace collection by keeping its visibility"""
+        old, idx = self.find_collection(coll.get_label())
+        if old:
+            visible = old.get_visible()
+            old.remove()
+            coll.set_visible(visible)
+            self.colls[idx] = coll
+        else:
+            self.colls.append(coll)
+
+    def replace_collections(self, colls):
+        for coll in colls:
+            self.replace_collection(coll)
+
+    def do_redraw(self):
+        colls = self.plot_cb(self.ax, self.extent_uv, *self.plot_params)
+        self.replace_collections(colls)
+        pyplot.draw()
+
+    def do_showhide(self, label):
+        coll, _ = self.find_collection(label)
+        if coll:
+            coll.set_visible(not coll.get_visible())
+            self.ax.legend()
+            pyplot.draw()
+
+    def slider_u_changed(self, val):
+        self.extent_uv[0] = int(val)
+        self.do_redraw()
+
+    def slider_v_changed(self, val):
+        self.extent_uv[1] = int(val)
+        self.do_redraw()
 
 def emi_gradients(pts, src_lines):
     emi_params = emi_calc.calc_all_emis(pts, src_lines)
@@ -205,12 +297,38 @@ def main(base_pt, src_lines):
     fig = pyplot.figure()
     ax = fig.gca(projection='3d')
 
+    colls = []
+
     # Current source line
     if SOURCE_FMT:
-        plot_source(ax, src_lines)
+        colls.append( plot_source(ax, src_lines))
 
     extent = vect_lens(src_lines.max(0) - src_lines.min(0))
-    plot_surface(ax, extent, emi_gradients, base_pt, src_lines)
+    main_data = main_class(ax, colls, plot_surface, extent, emi_gradients, base_pt, src_lines)
+    main_data.do_redraw()
+
+    # Base widget rectangle
+    rect1, rect2 = split_rect([0, 0, BASE_AX_WIDTH, BASE_AX_HEIGHT], AX_BTN_WIDTH)
+
+    # Check boxes to show/hide individual elements
+    rax = fig.add_axes(deflate_rect(rect1))
+    labels = [coll.get_label() for coll in colls]
+    visibility = [coll.get_visible() for coll in colls]
+    check = widgets.CheckButtons(rax, labels, visibility)
+    check.on_clicked(main_data.do_showhide)
+
+    # Sliders
+    _, rect21 = split_rect(rect2, AX_BTN_HEIGHT / 4)
+    rect214, rect213 = split_rect(rect21, AX_BTN_HEIGHT / 4, True)
+    rect213, _ = split_rect(rect213, AX_BTN_HEIGHT / 4, True)
+    rax = fig.add_axes(deflate_rect(rect213, SLIDER_HOR_MARGIN), fc='lightgray')
+    slider_u = widgets.Slider(rax, 'U extent', 0, 10, main_data.extent_uv[0],
+            dragging=False, valstep=1)
+    slider_u.on_changed(main_data.slider_u_changed)
+    rax = fig.add_axes(deflate_rect(rect214, SLIDER_HOR_MARGIN), fc='lightgray')
+    slider_v = widgets.Slider(rax, 'V extent', 0, 8, main_data.extent_uv[1],
+            dragging=False, valstep=1)
+    slider_v.on_changed(main_data.slider_v_changed)
 
     ax.set_title('Surface from normals')
     ax.legend()
