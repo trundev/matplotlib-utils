@@ -28,6 +28,9 @@ STEP_SCALE = .25
 # Approximation precision
 APPROX_TOLERANCE = 1e-3
 APPROX_MAX_ITERS = 3
+APPROX_ANGLE = 15 * (numpy.pi / 180)    # 1/6 of 90 degrees
+APPROX_ANGLE_COS = numpy.cos(APPROX_ANGLE)
+APPROX_ANGLE_SIN = numpy.sin(APPROX_ANGLE)
 
 SOURCE_FMT  = dict(color='green', label='Source')
 BASE_PT_FMT = dict(color='black', marker='o', label='Base point')
@@ -101,11 +104,33 @@ def adjust_points(pt, v, pt0, v0):
     """Adjust pt in order both points to be equidistant from the intersection of vectors"""
     rel_pt = pt0 - pt
     v = intersect_vects(v, rel_pt, v0 + rel_pt)
-    # "v": vector p -> intersection
-    # "v - rel_pt": vector p0 -> intersection
-    v_adj = vect_scale(v, 1 - vect_lens(v - rel_pt) / vect_lens(v))
+    #
+    # The intersection point at "pt + v" (or "pt0 + v - rel_pt") is the
+    # center of rotation of "pt0" toward "pt".
+    #
+    v0 = v - rel_pt
+    if False:
+        # Regular adjustment: move "pt" toward intersection
+        #
+        v_adj = vect_scale(v, 1 - vect_lens(v0) / vect_lens(v))
+    else:
+        # Extra adjustment: move "pt" in order the rotation to be at fixed angle
+        #
+        # Vector with the length of "v0", but pependicular to it toward "rel_pt"
+        perp = numpy.cross(v0, numpy.cross(v0, rel_pt))
+        perp = vect_scale(unit_vects(perp), vect_lens(v0))
+        # Rotate "v0" at APPROX_ANGLE around the center
+        rot_v0 = perp * APPROX_ANGLE_SIN - v0 * APPROX_ANGLE_COS
+        # Here vect_lens(rot_v0) == vect_lens(v0)
+        v_adj = rot_v0 + v
+
     # No adjustment when the lines are parallel
     numpy.place(v_adj, numpy.isposinf(v), 0)
+
+    # Check for negligible adjustments
+    adj_max2 = vect_dot(v_adj, v_adj).max()
+    if adj_max2 < APPROX_TOLERANCE ** 2:
+        v_adj = None
     return v_adj
 
 def surface_from_normals(extent_uv, normal_fn, base_pt, *params):
@@ -113,7 +138,7 @@ def surface_from_normals(extent_uv, normal_fn, base_pt, *params):
     def wrap_normal_fn(out, pt):
         normal, tangent = normal_fn(pt, *params)
         out['pt'] = pt
-        # Ensure tangent is perpendicular to normal
+        # Ensure tangent is perpendicular to normal and both are unit vectors
         out['norm'] = unit_vects(normal)
         out['tang'] = unit_vects(numpy.cross(numpy.cross(normal, tangent), normal))
         return
@@ -126,6 +151,8 @@ def surface_from_normals(extent_uv, normal_fn, base_pt, *params):
     surface = numpy.empty((1, 1), dtype=data_dtype)
 
     wrap_normal_fn(surface[0, 0], base_pt)
+    # Set initial tangent length
+    surface[0, 0]['tang'] *= STEP_SCALE
 
     for extent in range(max(extent_uv)):
         # Select in which directions to expand
@@ -145,24 +172,26 @@ def surface_from_normals(extent_uv, normal_fn, base_pt, *params):
             base_pts = surface[idx]
             tangents = base_pts['tang']
             if axis > 0:
-                # Use bi-tangent
-                tangents = unit_vects(numpy.cross(base_pts['norm'], tangents))
+                # Use bi-tangent (the 'norm' is unit vector perpendicular to 'tang')
+                tangents = numpy.cross(base_pts['norm'], tangents)
             if idx < 0:
                 tangents = -tangents
 
-            tangents *= STEP_SCALE  # TODO: Use proper step
-
             # Iterations to increase the approximation precision
-            pts = base_pts['pt'] + tangents
-            wrap_normal_fn(new_pts, pts)
+            pts = base_pts['pt'].copy()
+            pts_adj = tangents
             for _ in range(APPROX_MAX_ITERS):
-                pts_adj = adjust_points(pts, new_pts['norm'], base_pts['pt'], base_pts['norm'])
-                # Abort approximation when all adjustments are negligible
-                adj_max2 = vect_dot(pts_adj, pts_adj).max()
-                if adj_max2 < APPROX_TOLERANCE ** 2:
-                    break
                 pts += pts_adj
                 wrap_normal_fn(new_pts, pts)
+                pts_adj = adjust_points(pts, new_pts['norm'], base_pts['pt'], base_pts['norm'])
+                # Abort approximation when all adjustments are negligible
+                if pts_adj is None:
+                    break
+            if pts_adj is not None:
+                print('Warning: Approximation failed at extent:', extent, ', dir:', axis, idx, ', pts_adj:', pts_adj)
+
+            # The next step will be toward 'tang', but at same distance as that one
+            new_pts['tang'] = vect_scale(new_pts['tang'], vect_lens(pts - base_pts['pt']))
 
             new_pts = numpy.expand_dims(new_pts, 0)
             if idx < 0:
@@ -318,7 +347,7 @@ def main(base_pt, src_lines):
     check.on_clicked(main_data.do_showhide)
 
     # Sliders
-    _, rect21 = split_rect(rect2, AX_BTN_HEIGHT / 4)
+    _, rect21 = split_rect(rect2, AX_BTN_HEIGHT / 3)
     rect214, rect213 = split_rect(rect21, AX_BTN_HEIGHT / 4, True)
     rect213, _ = split_rect(rect213, AX_BTN_HEIGHT / 4, True)
     rax = fig.add_axes(deflate_rect(rect213, SLIDER_HOR_MARGIN), fc='lightgray')
