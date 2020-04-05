@@ -22,7 +22,7 @@ SOURCE_POLYLINE = [
 #   [0., 0., 4 * SRC_Z_STEP],    # down
 ]
 
-BASE_POINT = [.5, -1, .0]
+SEED_POINT = [.5, -1, .0]
 
 STEP_SCALE = .25
 # Approximation precision
@@ -32,12 +32,13 @@ APPROX_ANGLE = 15 * (numpy.pi / 180)    # 1/6 of 90 degrees
 APPROX_ANGLE_COS = numpy.cos(APPROX_ANGLE)
 APPROX_ANGLE_SIN = numpy.sin(APPROX_ANGLE)
 
-SOURCE_FMT  = dict(color='green', label='Source')
-BASE_PT_FMT = dict(color='black', marker='o', label='Base point')
-TANGENTS_FMT = dict(color='magenta', linestyle='--', label='Tangents')
-NORMALS_FMT = dict(color='blue', linestyle='-', label='Normals')
-POINT_FMT   = dict(color='magenta', marker='.', visible=False, label='Points')
-SURFACE_FMT = dict(cmap='viridis', edgecolor='none', alpha=.5, label='_Surface')    # Strange crash w/o leading underscore
+SOURCE_FMT  = {'color': 'green', 'label': 'Source'}
+SEED_PT_FMT = {'color': 'black', 'marker': 'o', 'label': 'Seed point'}
+TANGENTS_FMT = {'color': 'magenta', 'linestyle': '--', 'label': 'Tangents'}
+NORMALS_FMT = {'color': 'blue', 'linestyle': '-', 'label': 'Normals'}
+POINT_FMT   = {'color': 'magenta', 'marker': '.', 'visible': False, 'label': 'Points'}
+# Note: Axes3D.plot_surface() crashes when label does start with underscore!?!
+SURFACE_FMT = {'cmap': 'viridis', 'edgecolor': 'none', 'alpha': .5, 'label': '_Surface'}
 
 AX_MARGIN = .01
 SLIDER_HOR_MARGIN = .1
@@ -133,10 +134,10 @@ def adjust_points(pt, v, pt0, v0):
         v_adj = None
     return v_adj
 
-def surface_from_normals(extent_uv, normal_fn, base_pt, *params):
+def surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params):
     """Generate surface from its normals returned by an arbitrary function"""
     def wrap_normal_fn(out, pt):
-        normal, tangent = normal_fn(pt, *params)
+        normal, tangent = normal_fn(pt, *params, **kw_params)
         out['pt'] = pt
         # Ensure tangent is perpendicular to normal and both are unit vectors
         out['norm'] = unit_vects(normal)
@@ -144,13 +145,13 @@ def surface_from_normals(extent_uv, normal_fn, base_pt, *params):
         return
 
     data_dtype=[
-        ('pt', (base_pt.dtype, base_pt.shape[-1])),
-        ('norm', (base_pt.dtype, base_pt.shape[-1])),
-        ('tang', (base_pt.dtype, base_pt.shape[-1])),
+        ('pt', (seed_pt.dtype, seed_pt.shape[-1])),
+        ('norm', (seed_pt.dtype, seed_pt.shape[-1])),
+        ('tang', (seed_pt.dtype, seed_pt.shape[-1])),
         ]
     surface = numpy.empty((1, 1), dtype=data_dtype)
 
-    wrap_normal_fn(surface[0, 0], base_pt)
+    wrap_normal_fn(surface[0, 0], seed_pt)
     # Set initial tangent length
     surface[0, 0]['tang'] *= STEP_SCALE
 
@@ -207,18 +208,18 @@ def surface_from_normals(extent_uv, normal_fn, base_pt, *params):
 #
 # Plot
 #
-def plot_surface(ax, extent_uv, extent, normal_fn, base_pt, *params):
+def plot_surface(ax, extent_uv, scale, normal_fn, seed_pt, *params, **kw_params):
     """Plot specific surface"""
     colls = []
 
-    # Base target point
-    if BASE_PT_FMT:
-        colls.append( ax.scatter(*base_pt, **BASE_PT_FMT))
+    # The seed target point
+    if SEED_PT_FMT:
+        colls.append( ax.scatter(*seed_pt, **SEED_PT_FMT))
 
-    surface = surface_from_normals(extent_uv, normal_fn, base_pt, *params)
+    surface = surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params)
 
     # Re-obtain selected points
-    normals, tangents = normal_fn(surface, *params)
+    normals, tangents = normal_fn(surface, *params, **kw_params)
     n_lens = vect_lens(normals)
     t_lens = vect_lens(tangents)
     print('Surface (%s)'%(surface.shape[:-1],),
@@ -230,8 +231,8 @@ def plot_surface(ax, extent_uv, extent, normal_fn, base_pt, *params):
 
     # Visualize selected normals
     # Resize vectors to fit screen (ignore NaN-s)
-    normals *= extent / numpy.nanmax(n_lens) / 8
-    tangents *= extent / numpy.nanmax(t_lens) / 8
+    normals *= scale / numpy.nanmax(n_lens) / 8
+    tangents *= scale / numpy.nanmax(t_lens) / 8
     if NORMALS_FMT:
         colls.append( ax.quiver(*surface.T, *normals.T, **NORMALS_FMT))
     if TANGENTS_FMT:
@@ -269,11 +270,12 @@ def split_rect(rect, split_pos=.5, hor_split=False):
     return rect1, rect2
 
 class main_class:
-    def __init__(self, ax, colls, plot_cb, *plot_params):
+    def __init__(self, ax, colls, plot_cb, *plot_params, **plot_kw_params):
         self.ax = ax
         self.colls = colls
         self.plot_cb = plot_cb
         self.plot_params = plot_params
+        self.plot_kw_params = plot_kw_params
         self.extent_uv = [1, 1]
 
     def find_collection(self, label):
@@ -298,7 +300,7 @@ class main_class:
             self.replace_collection(coll)
 
     def do_redraw(self):
-        colls = self.plot_cb(self.ax, self.extent_uv, *self.plot_params)
+        colls = self.plot_cb(self.ax, self.extent_uv, *self.plot_params, **self.plot_kw_params)
         self.replace_collections(colls)
         pyplot.draw()
 
@@ -321,7 +323,7 @@ def emi_gradients(pts, src_lines):
     emi_params = emi_calc.calc_all_emis(pts, src_lines)
     return emi_params['gradB'], emi_params['B']
 
-def main(base_pt, src_lines):
+def main(seed_pt, src_lines):
     """Main entry"""
     fig = pyplot.figure()
     ax = fig.gca(projection='3d')
@@ -332,8 +334,8 @@ def main(base_pt, src_lines):
     if SOURCE_FMT:
         colls.append( plot_source(ax, src_lines))
 
-    extent = vect_lens(src_lines.max(0) - src_lines.min(0))
-    main_data = main_class(ax, colls, plot_surface, extent, emi_gradients, base_pt, src_lines)
+    scale = vect_lens(src_lines.max(0) - src_lines.min(0))
+    main_data = main_class(ax, colls, plot_surface, scale, emi_gradients, seed_pt, src_lines)
     main_data.do_redraw()
 
     # Base widget rectangle
@@ -366,5 +368,5 @@ def main(base_pt, src_lines):
 
 if __name__ == '__main__':
     src_lines = numpy.array(SOURCE_POLYLINE)
-    base_pt = numpy.array(BASE_POINT)
-    exit(main(base_pt, src_lines))
+    seed_pt = numpy.array(SEED_POINT)
+    exit(main(seed_pt, src_lines))
