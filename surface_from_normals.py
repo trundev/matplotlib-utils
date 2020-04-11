@@ -140,19 +140,22 @@ def surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params):
         out['pt'] = pt
         # Ensure tangent is perpendicular to normal and both are unit vectors
         out['norm'] = unit_vects(normal)
-        out['tang'] = unit_vects(numpy.cross(numpy.cross(normal, tangent), normal))
+        out['tang_u'] = unit_vects(numpy.cross(numpy.cross(normal, tangent), normal))
+        out['tang_v'] = numpy.cross(out['norm'], out['tang_u'])
         return
 
     data_dtype=[
         ('pt', (seed_pt.dtype, seed_pt.shape[-1])),
         ('norm', (seed_pt.dtype, seed_pt.shape[-1])),
-        ('tang', (seed_pt.dtype, seed_pt.shape[-1])),
+        ('tang_u', (seed_pt.dtype, seed_pt.shape[-1])),
+        ('tang_v', (seed_pt.dtype, seed_pt.shape[-1])),
         ]
     surface = numpy.empty((1, 1), dtype=data_dtype)
 
     wrap_normal_fn(surface[0, 0], seed_pt)
     # Set initial tangent length
-    surface[0, 0]['tang'] *= STEP_SCALE
+    surface[0, 0]['tang_u'] *= STEP_SCALE
+    surface[0, 0]['tang_v'] *= STEP_SCALE
 
     for extent in range(max(extent_uv)):
         # Select in which directions to expand
@@ -171,10 +174,9 @@ def surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params):
             new_pts = numpy.full(surface.shape[1:], numpy.nan, dtype=surface.dtype)
 
             base_pts = surface[idx]
-            tangents = base_pts['tang']
-            if axis > 0:
-                # Use bi-tangent (the 'norm' is unit vector perpendicular to 'tang')
-                tangents = numpy.cross(base_pts['norm'], tangents)
+            tang_id = 'tang_u' if axis == 0 else 'tang_v'
+            bitang_id = 'tang_v' if axis == 0 else 'tang_u'
+            tangents = base_pts[tang_id]
             if idx < 0:
                 tangents = -tangents
 
@@ -188,8 +190,10 @@ def surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params):
             if tangents is not None:
                 print('Warning: Approximation failed at extent:', extent, ', dir:', axis, idx, ', tangents:', tangents)
 
-            # The next step will be toward 'tang', but at same distance as that one
-            new_pts['tang'] = vect_scale(new_pts['tang'], vect_lens(new_pts['pt'] - base_pts['pt']))
+            # The next step toward current tangent will be at the distance of that one
+            new_pts[tang_id] = vect_scale(new_pts[tang_id], vect_lens(new_pts['pt'] - base_pts['pt']))
+            # The next step toward the "other" tangent will be at the distance from the base point
+            new_pts[bitang_id] = vect_scale(new_pts[bitang_id], vect_lens(base_pts[bitang_id]))
 
             # Expand the surface with the new points
             new_pts = numpy.expand_dims(new_pts, 0)
