@@ -101,38 +101,37 @@ def plot_source(ax, src_lines):
 #
 # Surface generation
 #
-def adjust_points(pt, v, pt0, v0):
+def adjust_points(pt, v, v0):
     """Adjust pt in order both points to be equidistant from the intersection of vectors"""
-    rel_pt = pt0 - pt
-    v = intersect_vects(v, rel_pt, v0 + rel_pt)
+    v0 = intersect_vects(v0, pt, v + pt)
     #
-    # The intersection point at "pt + v" (or "pt0 + v - rel_pt") is the
-    # center of rotation of "pt0" toward "pt".
+    # The intersection point at "v0" is the center of rotation of a point at
+    # the origin toward "pt"".
     #
-    v0 = v - rel_pt
     if False:
-        # Regular adjustment: move "pt" toward intersection
+        # Regular adjustment: move "pt" toward intersection, so as |v| == |v0|
         #
-        v_adj = vect_scale(v, 1 - vect_lens(v0) / vect_lens(v))
+        v = v0 - pt
+        pt_adj = v0 - vect_scale(v, vect_lens(v0) / vect_lens(v))
     else:
         # Extra adjustment: move "pt" in order the rotation to be at fixed angle
         #
-        # Vector with the length of "v0", but pependicular to it toward "rel_pt"
-        perp = numpy.cross(v0, numpy.cross(v0, rel_pt))
+        # Vector with the length of "v0", but pependicular to it toward "pt"
+        perp = numpy.cross(numpy.cross(v0, pt), v0)
         perp = vect_scale(unit_vects(perp), vect_lens(v0))
         # Rotate "v0" at APPROX_ANGLE around the center
         rot_v0 = perp * APPROX_ANGLE_SIN - v0 * APPROX_ANGLE_COS
         # Here vect_lens(rot_v0) == vect_lens(v0)
-        v_adj = rot_v0 + v
+        pt_adj = rot_v0 + v0
 
     # No adjustment when the lines are parallel
-    numpy.place(v_adj, numpy.isposinf(v), 0)
+    numpy.place(pt_adj, numpy.isposinf(v0), 0)
 
     # Check for negligible adjustments
-    adj_max2 = vect_dot(v_adj, v_adj).max()
+    adj_max2 = vect_dot(pt_adj - pt, pt_adj - pt).max()
     if adj_max2 < APPROX_TOLERANCE ** 2:
-        v_adj = None
-    return v_adj
+        pt_adj = None
+    return pt_adj
 
 def surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params):
     """Generate surface from its normals returned by an arbitrary function"""
@@ -168,6 +167,7 @@ def surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params):
             # Temporarily move axis to be processed at front
             surface = numpy.moveaxis(surface, axis, 0)
 
+            # Storage for the new points where the surface expands
             new_pts = numpy.full(surface.shape[1:], numpy.nan, dtype=surface.dtype)
 
             base_pts = surface[idx]
@@ -179,21 +179,19 @@ def surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params):
                 tangents = -tangents
 
             # Iterations to increase the approximation precision
-            pts = base_pts['pt'].copy()
-            pts_adj = tangents
             for _ in range(APPROX_MAX_ITERS):
-                pts += pts_adj
-                wrap_normal_fn(new_pts, pts)
-                pts_adj = adjust_points(pts, new_pts['norm'], base_pts['pt'], base_pts['norm'])
+                wrap_normal_fn(new_pts, base_pts['pt'] + tangents)
+                tangents = adjust_points(tangents, new_pts['norm'], base_pts['norm'])
                 # Abort approximation when all adjustments are negligible
-                if pts_adj is None:
+                if tangents is None:
                     break
-            if pts_adj is not None:
-                print('Warning: Approximation failed at extent:', extent, ', dir:', axis, idx, ', pts_adj:', pts_adj)
+            if tangents is not None:
+                print('Warning: Approximation failed at extent:', extent, ', dir:', axis, idx, ', tangents:', tangents)
 
             # The next step will be toward 'tang', but at same distance as that one
-            new_pts['tang'] = vect_scale(new_pts['tang'], vect_lens(pts - base_pts['pt']))
+            new_pts['tang'] = vect_scale(new_pts['tang'], vect_lens(new_pts['pt'] - base_pts['pt']))
 
+            # Expand the surface with the new points
             new_pts = numpy.expand_dims(new_pts, 0)
             if idx < 0:
                 surface = numpy.concatenate((surface, new_pts))
