@@ -124,14 +124,29 @@ def adjust_points(pt, v, v0):
         # Here vect_lens(rot_v0) == vect_lens(v0)
         pt_adj = rot_v0 + v0
 
-    # No adjustment when the lines are parallel
-    numpy.place(pt_adj, numpy.isposinf(v0), 0)
+    # Fix the NaN values, when the lines are parallel
+    numpy.place(pt_adj, numpy.isposinf(v0), numpy.inf)
+    return pt_adj
+
+def calc_adjustment(tangents, new_pts, base_pts, bitang_id):
+    """Adjust point by using normal and bi-tangent curvature"""
+    tang_adj = adjust_points(tangents, new_pts['norm'], base_pts['norm'])
+    tang_adj2 = adjust_points(tangents, new_pts[bitang_id], base_pts[bitang_id])
+
+    # Select the point closer to the base-point
+    mask = vect_dot(tang_adj, tang_adj) > vect_dot(tang_adj2, tang_adj2)
+    mask = numpy.broadcast_to(mask[..., numpy.newaxis], tang_adj.shape)
+    numpy.copyto(tang_adj, tang_adj2, where=mask)
+
+    # No adjustment when both tangents are parallel
+    numpy.place(tang_adj, numpy.isposinf(tang_adj), 0)
 
     # Check for negligible adjustments
-    adj_max2 = vect_dot(pt_adj - pt, pt_adj - pt).max()
+    adj = tang_adj - tangents
+    adj_max2 = vect_dot(adj, adj).max()
     if adj_max2 < APPROX_TOLERANCE ** 2:
-        pt_adj = None
-    return pt_adj
+        tang_adj = None
+    return tang_adj
 
 def surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params):
     """Generate surface from its normals returned by an arbitrary function"""
@@ -183,7 +198,7 @@ def surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params):
             # Iterations to increase the approximation precision
             for _ in range(APPROX_MAX_ITERS):
                 wrap_normal_fn(new_pts, base_pts['pt'] + tangents)
-                tangents = adjust_points(tangents, new_pts['norm'], base_pts['norm'])
+                tangents = calc_adjustment(tangents, new_pts, base_pts, bitang_id)
                 # Abort approximation when all adjustments are negligible
                 if tangents is None:
                     break
