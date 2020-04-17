@@ -13,18 +13,22 @@ import emi_calc
 #
 # EM source current flow
 #
-SRC_Z_STEP = 0  # 0.01
+# Helmholtz coils (two parallel circles at distance of R)
+rad = 1.
+phi = numpy.linspace(-numpy.pi, numpy.pi, num=9, endpoint=True)
 SOURCE_POLYLINE = [
-   [0., 0., 0 * SRC_Z_STEP],
-   [1., 0., 1 * SRC_Z_STEP],    # right
-#   [1., 1., 2 * SRC_Z_STEP],    # up
-#   [0., 1., 3 * SRC_Z_STEP],    # left
-#   [0., 0., 4 * SRC_Z_STEP],    # down
+    [rad * numpy.cos(phi), rad * numpy.sin(phi), phi.size * [rad/2]],
+    [rad * numpy.cos(phi), rad * numpy.sin(phi), phi.size * [-rad/2]],
 ]
+SOURCE_POLYLINE = numpy.transpose(SOURCE_POLYLINE, (0,2,1))
 
-SEED_POINT = [.5, -1, .0]
+#
+# Initial surface point
+#
+SEED_POINT = [2*rad, 0, 0]
+del rad, phi
 
-STEP_SCALE = .25
+INITIAL_STEP_SCALE = .25
 # Approximation precision
 APPROX_TOLERANCE = 1e-3
 APPROX_MAX_ITERS = 3
@@ -169,8 +173,8 @@ def surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params):
 
     wrap_normal_fn(surface[0, 0], seed_pt)
     # Set initial tangent length
-    surface[0, 0]['tang_u'] *= STEP_SCALE
-    surface[0, 0]['tang_v'] *= STEP_SCALE
+    surface[0, 0]['tang_u'] *= INITIAL_STEP_SCALE
+    surface[0, 0]['tang_v'] *= INITIAL_STEP_SCALE
 
     for extent in range(max(extent_uv)):
         # Select in which directions to expand
@@ -225,7 +229,7 @@ def surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params):
 #
 # Plot
 #
-def plot_surface(ax, extent_uv, scale, normal_fn, seed_pt, *params, **kw_params):
+def plot_geometry(ax, seed_pt, extent_uv, scale, normal_fn, *params, **kw_params):
     """Plot specific surface"""
     colls = []
 
@@ -286,24 +290,33 @@ def split_rect(rect, split_pos=.5, hor_split=False):
         rect2[0] += rect1[2]
     return rect1, rect2
 
+#
+# Main user interaction context
+#
 class main_class:
-    def __init__(self, ax, colls, plot_cb, *plot_params, **plot_kw_params):
+    def __init__(self, ax, seed_pt):
         self.ax = ax
-        self.colls = colls
+        self.colls = []
+        self.seed_pt = seed_pt
+        self.plot_cb = None
+        self.plot_params = None
+        self.plot_kw_params = None
+        self.extent_uv = [1, 1]
+
+    def on_redraw(self, plot_cb, *plot_params, **plot_kw_params):
         self.plot_cb = plot_cb
         self.plot_params = plot_params
         self.plot_kw_params = plot_kw_params
-        self.extent_uv = [1, 1]
 
-    def find_collection(self, label):
+    def _find_collection(self, label):
         for idx, coll in enumerate(self.colls):
-            if coll.get_label() == label:
+            if coll.get_label() is label:
                 return coll, idx
         return None, None
 
-    def replace_collection(self, coll):
+    def update_collection(self, coll):
         """Replace collection by keeping its visibility"""
-        old, idx = self.find_collection(coll.get_label())
+        old, idx = self._find_collection(coll.get_label())
         if old:
             visible = old.get_visible()
             old.remove()
@@ -312,21 +325,24 @@ class main_class:
         else:
             self.colls.append(coll)
 
-    def replace_collections(self, colls):
+    def update_collections(self, colls):
         for coll in colls:
-            self.replace_collection(coll)
+            self.update_collection(coll)
+
+    def get_collections(self):
+        return self.colls
 
     def do_redraw(self):
-        colls = self.plot_cb(self.ax, self.extent_uv, *self.plot_params, **self.plot_kw_params)
-        self.replace_collections(colls)
-        pyplot.draw()
+        colls = self.plot_cb(self.ax, self.seed_pt, self.extent_uv, *self.plot_params, **self.plot_kw_params)
+        self.update_collections(colls)
+        self.ax.figure.canvas.draw_idle()
 
     def do_showhide(self, label):
-        coll, _ = self.find_collection(label)
+        coll, _ = self._find_collection(label)
         if coll:
             coll.set_visible(not coll.get_visible())
             self.ax.legend()
-            pyplot.draw()
+            self.ax.figure.canvas.draw_idle()
 
     def slider_u_changed(self, val):
         self.extent_uv[0] = int(val)
@@ -345,14 +361,15 @@ def main(seed_pt, src_lines):
     fig = pyplot.figure()
     ax = fig.gca(projection='3d')
 
-    colls = []
+    flat_src_lines = src_lines.reshape((-1, src_lines.shape[-1]))
+    scale = vect_lens(flat_src_lines.max(0) - flat_src_lines.min(0))
+    main_data = main_class(ax, seed_pt)
+    main_data.on_redraw(plot_geometry, scale, emi_gradients, src_lines)
 
     # Current source line
     if SOURCE_FMT:
-        colls.append( plot_source(ax, src_lines))
+        main_data.update_collection( plot_source(ax, src_lines))
 
-    scale = vect_lens(src_lines.max(0) - src_lines.min(0))
-    main_data = main_class(ax, colls, plot_surface, scale, emi_gradients, seed_pt, src_lines)
     main_data.do_redraw()
 
     # Base widget rectangle
@@ -360,8 +377,11 @@ def main(seed_pt, src_lines):
 
     # Check boxes to show/hide individual elements
     rax = fig.add_axes(deflate_rect(rect1))
-    labels = [coll.get_label() for coll in colls]
-    visibility = [coll.get_visible() for coll in colls]
+    labels = []
+    visibility = []
+    for coll in main_data.get_collections():
+        labels.append(coll.get_label())
+        visibility.append(coll.get_visible())
     check = widgets.CheckButtons(rax, labels, visibility)
     check.on_clicked(main_data.do_showhide)
 
@@ -374,7 +394,7 @@ def main(seed_pt, src_lines):
             dragging=False, valstep=1)
     slider_u.on_changed(main_data.slider_u_changed)
     rax = fig.add_axes(deflate_rect(rect214, SLIDER_HOR_MARGIN), fc='lightgray')
-    slider_v = widgets.Slider(rax, 'V extent', 0, 8, main_data.extent_uv[1],
+    slider_v = widgets.Slider(rax, 'V extent', 0, 10, main_data.extent_uv[1],
             dragging=False, valstep=1)
     slider_v.on_changed(main_data.slider_v_changed)
 
