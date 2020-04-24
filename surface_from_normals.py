@@ -9,6 +9,7 @@ import matplotlib.pyplot as pyplot
 import matplotlib.widgets as widgets
 import mpl_toolkits.mplot3d as mplot3d
 import emi_calc
+import draggable
 
 #
 # EM source current flow
@@ -38,6 +39,7 @@ APPROX_ANGLE_SIN = numpy.sin(APPROX_ANGLE)
 
 SOURCE_FMT  = {'color': 'green', 'label': 'Source'}
 SEED_PT_FMT = {'color': 'black', 'marker': 'o', 'label': 'Seed point'}
+SEED_GIZMO_FMT = {'color': [1,0,0,.2], 'label': 'Seed gizmo'}
 TANGENTS_FMT = {'color': 'magenta', 'linestyle': '--', 'label': 'Tangents'}
 NORMALS_FMT = {'color': 'blue', 'linestyle': '-', 'label': 'Normals'}
 POINT_FMT   = {'color': 'magenta', 'marker': '.', 'visible': False, 'label': 'Points'}
@@ -352,6 +354,22 @@ class main_class:
         self.extent_uv[1] = int(val)
         self.do_redraw()
 
+    def gizmo_moved(self, drag, offset):
+        print('on_gizmo_moved', offset)
+        if offset:
+            self.seed_pt[0] += .1 if offset > 0 else -.1
+
+        scale = 1####
+        gizmo_vect = numpy.array([scale/4, 0, 0])
+        ##gizmo_dirs = numpy.stack((gizmo_vect, numpy.roll(gizmo_vect, 1), numpy.roll(gizmo_vect, 2)))
+        gizmo_dirs = numpy.stack((gizmo_vect,))
+        gizmo_pts = numpy.broadcast_to(self.seed_pt, (gizmo_dirs.shape[0], *seed_pt.shape))
+        gizmo_actor = self.ax.quiver(*gizmo_pts.T, *gizmo_dirs.T, **SEED_GIZMO_FMT)
+
+        self.update_collection(gizmo_actor)
+        self.do_redraw()
+        drag.update_actor(gizmo_actor)
+
 def emi_gradients(pts, src_lines):
     emi_params = emi_calc.calc_all_emis(pts, src_lines)
     return emi_params['gradB'], emi_params['B']
@@ -370,7 +388,10 @@ def main(seed_pt, src_lines):
     if SOURCE_FMT:
         main_data.update_collection( plot_source(ax, src_lines))
 
-    main_data.do_redraw()
+    drag = draggable.Draggable(fig, main_data.gizmo_moved)
+
+    # This also calls do_redraw()
+    main_data.gizmo_moved(drag, 0)
 
     # Base widget rectangle
     rect1, rect2 = split_rect([0, 0, BASE_AX_WIDTH, BASE_AX_HEIGHT], AX_BTN_WIDTH)
