@@ -221,9 +221,18 @@ def surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params):
             if tangents is not None:
                 print('Warning: Approximation failed at extent:', extent, ', dir:', axis, idx, ', tangents:', tangents)
 
-            # The next step toward current tangent will be at the distance of that one
+            # The next step toward current tangent will be at the distance and the direction of that one
             new_tangs = new_pts['tangs']
-            new_tangs[tang_sl] = vect_scale(new_tangs[tang_sl], vect_lens(new_pts['pt'] - base_pts['pt']))
+            this_step = new_pts['pt'] - base_pts['pt']
+            if idx < 0:
+                this_step = -this_step
+            new_tangs[tang_sl] = vect_scale(new_tangs[tang_sl], numpy.negative(
+                    # Preserve distance
+                    vect_lens(this_step),
+                    # Peserve direction
+                    where=vect_dot(this_step, new_tangs[tang_sl]) < 0
+                ))
+
             # The next step toward the "other" tangent will be at the distance from the base point
             new_tangs[bitang_sl] = vect_scale(new_tangs[bitang_sl], vect_lens(base_pts['tangs'][bitang_sl]))
 
