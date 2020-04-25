@@ -132,10 +132,10 @@ def adjust_points(pt, v, v0):
     numpy.place(pt_adj, numpy.isposinf(v0), numpy.inf)
     return pt_adj
 
-def calc_adjustment(tangents, new_pts, base_pts, bitang_id):
+def calc_adjustment(tangents, new_pts, base_pts, bitang_sl):
     """Adjust point by using normal and bi-tangent curvature"""
     tang_adj = adjust_points(tangents, new_pts['norm'], base_pts['norm'])
-    tang_adj2 = adjust_points(tangents, new_pts[bitang_id], base_pts[bitang_id])
+    tang_adj2 = adjust_points(tangents, new_pts['tangs'][bitang_sl], base_pts['tangs'][bitang_sl])
 
     # Select the point closer to the base-point
     mask = vect_dot(tang_adj, tang_adj) > vect_dot(tang_adj2, tang_adj2)
@@ -157,24 +157,28 @@ def surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params):
     def wrap_normal_fn(out, pt):
         normal, tangent = normal_fn(pt, *params, **kw_params)
         out['pt'] = pt
-        # Ensure tangent is perpendicular to normal and both are unit vectors
+        # Ensure both tangents are perpendicular to normal and all are unit vectors
         out['norm'] = unit_vects(normal)
-        out['tang_u'] = unit_vects(numpy.cross(numpy.cross(normal, tangent), normal))
-        out['tang_v'] = numpy.cross(out['norm'], out['tang_u'])
+        tangs = unit_vects(numpy.cross(numpy.cross(normal, tangent), normal))
+        out['tangs'][..., 0, :] = tangs
+        out['tangs'][..., 1, :] = numpy.cross(out['norm'], tangs)
         return
 
+    # Internal context for each surface point
     data_dtype=[
+        # The surface point
         ('pt', (seed_pt.dtype, seed_pt.shape[-1])),
+        # Normal vector to surface
         ('norm', (seed_pt.dtype, seed_pt.shape[-1])),
-        ('tang_u', (seed_pt.dtype, seed_pt.shape[-1])),
-        ('tang_v', (seed_pt.dtype, seed_pt.shape[-1])),
+        # Tangent and bi-tangent
+        ('tangs', (seed_pt.dtype, (2, seed_pt.shape[-1]))),
         ]
     surface = numpy.empty((1, 1), dtype=data_dtype)
 
     wrap_normal_fn(surface[0, 0], seed_pt)
     # Set initial tangent length
-    surface[0, 0]['tang_u'] *= INITIAL_STEP_SCALE
-    surface[0, 0]['tang_v'] *= INITIAL_STEP_SCALE
+    surface[0, 0]['tangs'][0] *= INITIAL_STEP_SCALE
+    surface[0, 0]['tangs'][1] *= INITIAL_STEP_SCALE
 
     for extent in range(max(extent_uv)):
         # Select in which directions to expand
@@ -186,23 +190,31 @@ def surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params):
             axis_idxs = [(1, -1), (1, 0)]
 
         for axis, idx in axis_idxs:
-            # Temporarily move axis to be processed at front
-            surface = numpy.moveaxis(surface, axis, 0)
+            # Duplicating the edge (first or last row/column) to expand the surface
+            pad_width = numpy.zeros((surface.ndim, 2), dtype=int)
+            pad_width[axis, idx] = 1
+            surface = numpy.pad(surface, pad_width, 'edge')
 
-            # Storage for the new points where the surface expands
-            new_pts = numpy.full(surface.shape[1:], numpy.nan, dtype=surface.dtype)
+            # Reference to the newly added edge
+            sl = surface.ndim * [slice(None)]
+            sl[axis] = idx
+            new_pts = surface[tuple(sl)]
 
-            base_pts = surface[idx]
-            tang_id = 'tang_u' if axis == 0 else 'tang_v'
-            bitang_id = 'tang_v' if axis == 0 else 'tang_u'
-            tangents = base_pts[tang_id]
+            # Reference to the original (base) edge -- 1 or -2
+            sl[axis] = idx + (-1 if idx < 0 else 1)
+            base_pts = surface[tuple(sl)]
+
+            # Select the tangents and bi-tangents for the particular axis
+            tang_sl = numpy.s_[..., axis, :]
+            bitang_sl = numpy.s_[...,  1 - axis, :]
+            tangents = base_pts['tangs'][tang_sl]
             if idx < 0:
                 tangents = -tangents
 
             # Iterations to increase the approximation precision
             for _ in range(APPROX_MAX_ITERS):
                 wrap_normal_fn(new_pts, base_pts['pt'] + tangents)
-                tangents = calc_adjustment(tangents, new_pts, base_pts, bitang_id)
+                tangents = calc_adjustment(tangents, new_pts, base_pts, bitang_sl)
                 # Abort approximation when all adjustments are negligible
                 if tangents is None:
                     break
@@ -210,19 +222,10 @@ def surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params):
                 print('Warning: Approximation failed at extent:', extent, ', dir:', axis, idx, ', tangents:', tangents)
 
             # The next step toward current tangent will be at the distance of that one
-            new_pts[tang_id] = vect_scale(new_pts[tang_id], vect_lens(new_pts['pt'] - base_pts['pt']))
+            new_tangs = new_pts['tangs']
+            new_tangs[tang_sl] = vect_scale(new_tangs[tang_sl], vect_lens(new_pts['pt'] - base_pts['pt']))
             # The next step toward the "other" tangent will be at the distance from the base point
-            new_pts[bitang_id] = vect_scale(new_pts[bitang_id], vect_lens(base_pts[bitang_id]))
-
-            # Expand the surface with the new points
-            new_pts = numpy.expand_dims(new_pts, 0)
-            if idx < 0:
-                surface = numpy.concatenate((surface, new_pts))
-            else:
-                surface = numpy.concatenate((new_pts, surface))
-
-            # Move back processed axis
-            surface = numpy.moveaxis(surface, 0, axis)
+            new_tangs[bitang_sl] = vect_scale(new_tangs[bitang_sl], vect_lens(base_pts['tangs'][bitang_sl]))
 
     return surface['pt']
 
@@ -231,6 +234,9 @@ def surface_from_normals(extent_uv, normal_fn, seed_pt, *params, **kw_params):
 #
 def plot_geometry(ax, seed_pt, extent_uv, scale, normal_fn, *params, **kw_params):
     """Plot specific surface"""
+    print('')
+    print('Generating surface seed %s, extents %d/%d'%(seed_pt, *extent_uv))
+
     colls = []
 
     # The seed target point
@@ -243,7 +249,7 @@ def plot_geometry(ax, seed_pt, extent_uv, scale, normal_fn, *params, **kw_params
     normals, tangents = normal_fn(surface, *params, **kw_params)
     n_lens = vect_lens(normals)
     t_lens = vect_lens(tangents)
-    print('Surface (%s)'%(surface.shape[:-1],),
+    print('Surface %s'%(surface.shape[:-1],),
           ',', numpy.count_nonzero(numpy.isnan(surface.sum(-1))), 'NaNs')
     print('Normals (mean/max/min)', numpy.nanmean(n_lens), numpy.nanmax(n_lens), numpy.nanmin(n_lens),
           ',', numpy.count_nonzero(numpy.isnan(n_lens)), 'NaNs')
