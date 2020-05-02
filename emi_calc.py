@@ -5,15 +5,40 @@ Requires: numpy
 import sys
 import numpy
 
-def calc_emi_dif(tgt_pt, src_pt, src_dir):
+def build_jacobian(l_comp, R_comp, l_vect, R_vect, B_vect):
+    """Combine gradient components along 'l' and 'R' into a Jacobian matrix"""
+    l_len = numpy.sqrt((l_vect * l_vect).sum(-1))
+    R_len = numpy.sqrt((R_vect * R_vect).sum(-1))
+    B_len = numpy.sqrt((B_vect * B_vect).sum(-1))
+    # Empty 3x3 jacobian matrix
+    jacob = numpy.zeros((B_vect.shape[-1], B_vect.shape[-1]), B_vect.dtype)
+
+    # This is in the space with a standard basis along the "l", "R" and "B" axes
+    jacob[1, 2] = -B_len / R_len
+    jacob[2, 0] = l_comp
+    jacob[2, 1] = R_comp
+
+    # Transform the Jacobian to main space
+    xform = numpy.stack((
+            l_vect / l_len,
+            R_vect / R_len,
+            B_vect / B_len
+        )).T
+    xform_inv = numpy.linalg.inv(xform)
+    return numpy.matmul(xform, numpy.matmul(jacob.T, xform_inv)).T
+
+def calc_emi_dif(tgt_pt, src_pt, src_dir, coef=1):
     """Calculate the magnetic field at specific point, induced by movement of a charged particle.
 
     Returns: [
             <B-vect>,       # Magnetic field vector at the point
-            <gradB-vect>,   # Gradient vector of the magnetic field (calculated from the magnitude)
+            <B-jacob>,      # Jacobian matrix of the magnetic field
         ]
     """
-    emi_params = numpy.zeros((2, tgt_pt.shape[0]), dtype=numpy.float64)
+    emi_params = [
+            numpy.zeros(tgt_pt.shape[-1], tgt_pt.dtype),
+            numpy.zeros((tgt_pt.shape[-1], tgt_pt.shape[-1]), tgt_pt.dtype)
+        ]
 
     # 'r' vector
     r = tgt_pt - src_pt
@@ -34,10 +59,13 @@ def calc_emi_dif(tgt_pt, src_pt, src_dir):
     # dl x r / r^3
     B = numpy.cross(src_dir, r) / r_len ** 3
 
+    # Scale by a coefficient, like current, magnetic constant and 1/(4*pi)
+    B *= coef
+
     emi_params[0] = B
 
     # Calculate the partial derivatives from Biot–Savart law "R/sqrt(l^2 + R^2)^3" (see calc_emi())
-    # along "l" and "R" axes, then integrate each of them along 'l'.
+    # along "l" and "R" axes.
 
     # Gradient component along 'l':
     # Use derivative calculator https://www.derivative-calculator.net/ (substitute l with x):
@@ -52,8 +80,6 @@ def calc_emi_dif(tgt_pt, src_pt, src_dir):
         l_len = -l_len
 
     l_comp = -3 * R_len * l_len / r_len ** 5
-    # Make it vector along 'l'
-    l_comp *= src_dir / numpy.sqrt(src_dir_len2)
 
     # Gradient component along 'R':
     # Use derivative calculator https://www.derivative-calculator.net/ (substitute R with x):
@@ -62,12 +88,12 @@ def calc_emi_dif(tgt_pt, src_pt, src_dir):
     #   result: (l^2 - 2R^2) / r^5
 
     R_comp = (l_len2 - 2 * R_len2) / r_len ** 5
-    # Make it vector along 'l'
-    R_comp *= R / R_len
 
-    # Combine 'l' and 'R' components
-    gradB = l_comp + R_comp
-    emi_params[1] = gradB
+    l_comp *= coef
+    R_comp *= coef
+
+    # Combine l_comp and R_comp into a Jacobian matrix
+    emi_params[1] = build_jacobian(l_comp, R_comp, src_dir, R, B)
 
     return emi_params
 
@@ -184,26 +210,12 @@ def calc_emi(tgt_pt, src_pt, src_dir, coef=1):
     R_comp = -l1_len*(r1_len ** 2 + R_len2) / (R_len2 * r1_len ** 3)
     R_comp -= -l0_len*(r0_len ** 2 + R_len2) / (R_len2 * r0_len ** 3)
 
-    B_len = numpy.sqrt((B * B).sum(-1))
+    # The '-' is to flip direction to point toward field magnitude increase
+    l_comp *= -coef
+    R_comp *= coef
 
     # Combine l_comp and R_comp into a Jacobian matrix
-    # This is in the space with a standard basis along the "l", "R" and "B" axes
-    jacob = emi_params[1]
-    jacob[1, 2] = -B_len / R_len
-    # The '-' is to flip direction to point toward field magnitude increase
-    jacob[2, 0] = -l_comp
-    jacob[2, 1] = R_comp
-
-    # Transform the Jacobian to main space
-    xform = numpy.stack((
-            src_dir / numpy.sqrt(src_dir_len2),
-            R / R_len,
-            B / B_len
-        )).T
-    xform_inv = numpy.linalg.inv(xform)
-    jacob = numpy.matmul(xform, numpy.matmul(jacob.T, xform_inv)).T
-
-    emi_params[1] = jacob
+    emi_params[1] = build_jacobian(l_comp, R_comp, src_dir, R, B)
 
     return emi_params
 
@@ -213,7 +225,7 @@ def generate_gradB(B, jacob):
     gradB = numpy.matmul(B / Blen, jacob)
     return gradB
 
-def calc_all_emis(tgt_pts, src_lines):
+def calc_all_emis(tgt_pts, src_lines, coef=1):
     """Calculate EMI parameters B and dB at each of the target points
 
     Requirements:
@@ -253,7 +265,7 @@ def calc_all_emis(tgt_pts, src_lines):
     emi_it = numpy.nditer(emi_params, op_flags=[['readwrite']])
     for emi_pars in emi_it:
         for src_pt, src_dir in zip(src_pts, src_dirs):
-            emi = calc_emi(emi_pars['pt'], src_pt, src_dir)
+            emi = calc_emi(emi_pars['pt'], src_pt, src_dir, coef)
             if emi is not None:     # Ignore point collinear to the src-line
                 if numpy.isnan(emi_pars['B']).all():
                     emi_pars['B'] = 0
