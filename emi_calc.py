@@ -219,6 +219,21 @@ def calc_emi(tgt_pt, src_pt, src_dir, coef=1):
 
     return emi_params
 
+def generate_dr_dI(B, jacob):
+    """Calculate I.dr/dI (a vector to be multiplied by dI/I)
+
+    The dr/dI is an imaginary change in the point position (dr), that would provoke the same EMI effect as a
+    change in the electric current (dI). The movement is toward the gradient of the magnitude of the field,
+    i.e. the closest point with the same |B| as at the current point, but after the current is changed.
+    The cross product between this vector and B is proportional to the EMF caused by the dI.
+    """
+    # dB/dI = gradB.dr/dI = |B|/I  =>  I.dr/dI = |B|.gradB/gradB^2 = |B|.B/|B|.Jacob / (B/|B|.Jacob)^2
+    # =>  I.dr/dI = |B|^2.B.Jacob / (B.Jacob)^2
+    B_jacob = numpy.matmul(B, jacob)
+    dr_dI = B_jacob / (B_jacob * B_jacob).sum(-1)
+    dr_dI *= (B * B).sum(-1)
+    return dr_dI
+
 def generate_gradB(B, jacob):
     """Calculate gradient of the magnitude of 'B' by using Jacobian matrix"""
     Blen = numpy.sqrt((B * B).sum(-1))
