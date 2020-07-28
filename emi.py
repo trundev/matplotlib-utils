@@ -1,6 +1,6 @@
 '''Electromagnetic induction model visualization
 
-Tested on python 3.7.5. Requires: numpy, matplotlib, emi_calc
+Tested on python 3.8.3. Requires: numpy, matplotlib, emi_calc
 '''
 import sys
 import numpy
@@ -49,6 +49,7 @@ TARGET_POINTS = [
 # Slider origin/direction parameters
 SOURCE_SLIDER_ORG = [0.5, 1, 0]
 TARGET_SLIDER_DIR = [0, 1, 0]
+SOURCE_SLIDER_DIR = [1, 1, 1]
 
 FIELD_SCALE = .2
 EMF_SCALE = .1
@@ -124,7 +125,7 @@ class main_data:
     def __init__(self, ax):
         self.ax = ax
 
-    def redraw(self, src_lines, tgt_pts):
+    def redraw(self, src_lines, tgt_pts, coef=1):
         # EMI source lines
         if src_lines is None:
             src_lines = self.src_lines
@@ -140,7 +141,24 @@ class main_data:
             self.tgt_pts = tgt_pts
 
         # Calculate EMI parameters B and dB for each target point
-        emi_params = emi_calc.calc_all_emis(tgt_pts, src_lines)
+        emi_params = emi_calc.calc_all_emis(tgt_pts, src_lines, coef)
+        if True:
+            print("Calculated EMI parameters for %d target points:"%tgt_pts[...,0].size)
+            pts = emi_params['pt']
+            B_vecs = emi_params['B']
+            gradB_vecs = emi_params['gradB']
+            emf_vecs = numpy.cross(gradB_vecs, B_vecs)
+            print("\t[x, y, z]: B-len / gradB-len [x, y, z] / emf-len")
+            print("\t------------------------------------------------")
+            for pt, bl, gb, gbl, emfl in zip(
+                    pts,
+                    numpy.sqrt((B_vecs * B_vecs).sum(-1)),
+                    gradB_vecs,
+                    numpy.sqrt((gradB_vecs * gradB_vecs).sum(-1)),
+                    numpy.sqrt((emf_vecs * emf_vecs).sum(-1)),
+                    ):
+                print('\t[%+.3f, %+.3f, %+.3f]: %.3f / %.3f [%+.3f, %+.3f, %+.3f] / %.3f'%(
+                        *pt, bl, gbl, *gb, emfl))
 
         pts = emi_params['pt'].transpose()
 
@@ -182,6 +200,7 @@ class src_changed:
 
     def __call__(self, pos):
         src_lines = numpy.array(SOURCE_POLYLINE)
+        pos = numpy.ones(3) + numpy.array(SOURCE_SLIDER_DIR) * (pos - 1)
         for idx, pt in enumerate(src_lines):
             src_lines[idx] = (pt - self.origin) * pos + self.origin
 
