@@ -52,7 +52,7 @@ TARGET_SLIDER_DIR = [0, 1, 0]
 SOURCE_SLIDER_DIR = [1, 1, 1]
 
 FIELD_SCALE = .2
-EMF_SCALE = .1
+EMF_SCALE = .2
 
 AX_MARGIN = .02
 AX_BTN_HEIGHT = .2
@@ -147,18 +147,20 @@ class main_data:
             pts = emi_params['pt']
             B_vecs = emi_params['B']
             gradB_vecs = emi_params['gradB']
-            emf_vecs = numpy.cross(gradB_vecs, B_vecs)
-            print("\t[x, y, z]: B-len / gradB-len [x, y, z] / emf-len")
-            print("\t------------------------------------------------")
-            for pt, bl, gb, gbl, emfl in zip(
+            dr_dI_vecs = emi_params['dr_dI']
+            emf_vecs = numpy.cross(dr_dI_vecs, B_vecs)
+            print("\t[x, y, z]: B-len / gradB-len [x, y, z] / dr_dI-len / emf-len")
+            print("\t------------------------------------------------------------")
+            for pt, bl, gb, gbl, drl, emfl in zip(
                     pts,
                     numpy.sqrt((B_vecs * B_vecs).sum(-1)),
                     gradB_vecs,
                     numpy.sqrt((gradB_vecs * gradB_vecs).sum(-1)),
+                    numpy.sqrt((dr_dI_vecs * dr_dI_vecs).sum(-1)),
                     numpy.sqrt((emf_vecs * emf_vecs).sum(-1)),
                     ):
-                print('\t[%+.3f, %+.3f, %+.3f]: %.3f / %.3f [%+.3f, %+.3f, %+.3f] / %.3f'%(
-                        *pt, bl, gbl, *gb, emfl))
+                print('\t[%+.3f, %+.3f, %+.3f]: %.3f / %.3f [%+.3f, %+.3f, %+.3f] / %.3f / %.3f'%(
+                        *pt, bl, gbl, *gb, drl, emfl))
 
         pts = emi_params['pt'].transpose()
 
@@ -174,7 +176,7 @@ class main_data:
 
         # The EMF induced because of field change
         if EMF_FMT:
-            emf = numpy.cross(emi_params['gradB'], emi_params['B'])
+            emf = numpy.cross(emi_params['dr_dI'], emi_params['B'])
             emf = emf.dot(EMF_SCALE).transpose()
             self.emf_coll = replace_collection(self.emf_coll, self.ax.quiver(*pts, *emf, **EMF_FMT))
         return True

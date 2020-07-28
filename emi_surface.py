@@ -65,7 +65,7 @@ def equipotential_surface(base_pt, src_lines, tolerance=.01):
     tan_phi = numpy.tan(revolution / 3 / U_MAX)
     tan_psi = numpy.tan(revolution / 3 / V_MAX)
 
-    # Iterate along direction of "gradB x B" (v)
+    # Iterate along direction of "dr_dI x B" (v)
     pt = base_params['pt']
     v = 0
     while v < V_MAX:
@@ -74,13 +74,13 @@ def equipotential_surface(base_pt, src_lines, tolerance=.01):
         u = 0
         while u < U_MAX:
             print('Point', (u, v))
-            # Step along direction of "gradB" to find the exact location
+            # Step along direction of "dr_dI" (same as "gradB") to find the exact location
             fail = True
             info[v, u]['iter'] = 0
             for iter in range(MAX_ITERATIONS):
                 emi_params = emi_calc.calc_all_emis(pt, src_lines)
                 B = emi_params['B']
-                gradB = emi_params['gradB']
+                dr_dI = emi_params['dr_dI']
                 B_len = numpy.sqrt(B.dot(B))
                 dB = base_B_len - B_len
                 if abs(dB) < tolerance * base_B_len:
@@ -90,7 +90,8 @@ def equipotential_surface(base_pt, src_lines, tolerance=.01):
                     break
 
                 # Location correction: "dB / |gradB|" along the normalized "gradB"
-                pt += gradB * dB / gradB.dot(gradB)
+                # Optimize this by using "dr_dI": dr_dI = |B| . gradB / |gradB|^2
+                pt += dB / B_len * dr_dI
                 print('  pt', pt, 'dB', dB, '(%.1f%%)'%(dB / base_B_len * 100))
 
             if fail:
@@ -101,14 +102,14 @@ def equipotential_surface(base_pt, src_lines, tolerance=.01):
             if base_params is None:
                 base_params = emi_params
 
-            # Do step along "u", moving toward "B", but perpendicular to "gradB"
-            # (this is the vector "gradB x B x gradB")
-            pt = step_along(pt, numpy.cross(numpy.cross(gradB, B), gradB), center_pt, tan_phi)
+            # Do step along "u", moving toward "B", but perpendicular to "dr_dI" (or "gradB")
+            # (this is the vector "dr_dI x B x dr_dI")
+            pt = step_along(pt, numpy.cross(numpy.cross(dr_dI, B), dr_dI), center_pt, tan_phi)
             u += 1
 
         # Do step along "v", moving perpendicular to "u"
         pt = base_params['pt']
-        pt = step_along(pt, numpy.cross(base_params['gradB'], base_params['B']), center_pt, tan_psi)
+        pt = step_along(pt, numpy.cross(base_params['dr_dI'], base_params['B']), center_pt, tan_psi)
         v += 1
 
     iters = info['iter']

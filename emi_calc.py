@@ -250,6 +250,7 @@ def calc_all_emis(tgt_pts, src_lines, coef=1):
             'B': <B-vect>,          # Magnetic field vector
             'jacob': <matrix>,      # Jacobian matrix
             'gradB': <gradB-vect>   # Gradient of the magnetic field magnitude (derived from 'jacob')
+            'dr_dI': <dr_dI-vect>   # The dr/dI vector (|B|.gradB/|gradB|^2)
         }
     """
     if not tgt_pts.dtype.fields:
@@ -260,12 +261,14 @@ def calc_all_emis(tgt_pts, src_lines, coef=1):
             ('B', tgt_pts.dtype, (3,)),
             ('jacob', tgt_pts.dtype, (3,3)),
             ('gradB', tgt_pts.dtype, (3,)),
+            ('dr_dI', tgt_pts.dtype, (3,)),
             ])
         emi_params = numpy.empty(tgt_pts.shape[:-1], emi_pars_dt)
         emi_params['pt'] = tgt_pts
         emi_params['B'] = numpy.nan
         emi_params['jacob'] = numpy.nan
         emi_params['gradB'] = numpy.nan
+        emi_params['dr_dI'] = numpy.nan
     else:
         # Option 2: tgt_pts contains EMI params structure
         # The result is added to existing field (superposition principle)
@@ -294,5 +297,6 @@ def calc_all_emis(tgt_pts, src_lines, coef=1):
     emi_it = numpy.nditer(emi_params, op_flags=[['readwrite']])
     for emi_pars in emi_it:
         emi_pars['gradB'] = generate_gradB(emi_pars['B'], emi_pars['jacob'])
+        emi_pars['dr_dI'] = generate_dr_dI(emi_pars['B'], emi_pars['jacob'])
 
     return emi_params
