@@ -39,15 +39,36 @@ def intersect(vect, point0, point1):
     if ALLOW_OPTIMIZATION:
         # Optimize out the cross product and square root (meaningful in 3D scenarios only):
         # Scale = |AxB|^2 / [(AxB).(AxC) + (AxB).(CxB)] =
-        # = (|A|^2|B|^2 - |A.B|^2) / (A - B).[A(B.C) - B(A.C)]
-        scale = point0.dot(point0) * point1.dot(point1) - point0.dot(point1) ** 2
-        scale /= (point0 - point1).dot( point0 * point1.dot(vect) - point1 * point0.dot(vect))
-    else:
+        # = (|A|^2|B|^2 - |A.B|^2) / (A - B).[A(B.C) - B(A.C)] =
+        # = (|A|^2|B|^2 - |A.B|^2) / [(|A|^2 - A.B)(B.C) - (A.B - |B|^2)(A.C)]
+        a_2 = point0.dot(point0)
+        b_2 = point1.dot(point1)
+        a_dot_b = point0.dot(point1)
+        a_dot_c = point0.dot(vect)
+        b_dot_c = point1.dot(vect)
+        scale = a_2 * b_2 - a_dot_b * a_dot_b
+        scale /= (a_2 - a_dot_b) * b_dot_c - (a_dot_b - b_2) * a_dot_c
+    elif False:
         # Scale = |AxB| / (|AxC + CxB|)
         def _len(v):
             # With 2D vectors numpy.cross() returns scalar
             return vect_len(v) if v.shape else v
         scale = _len(numpy.cross(point0, point1)) / _len(numpy.cross(point0, vect) + numpy.cross(vect, point1))
+    else:
+        # Use projection of the vector over a perpendicular to the line
+        # Perpedicular P = (AB x A) x AB / |AB|^2
+        # Scale = |P|^2 / (P . C)
+        # Convert to 3D or numpy.cross returns scalar
+        if vect.shape[-1] == 2:
+            v = numpy.append(vect, 0)
+        if point0.shape[-1] == 2:
+            point0 = numpy.append(point0, 0)
+        if point1.shape[-1] == 2:
+            point1 = numpy.append(point1, 0)
+        a_b = point1 - point0
+        # Perpendicular to A->B, toward A
+        perp = numpy.cross(numpy.cross(a_b, point0), a_b)
+        scale = perp.dot(perp) / (a_b.dot(a_b) * perp.dot(v))
     return vect * scale
 
 def distance_to_line(point, dir):
@@ -155,7 +176,8 @@ def main():
         pyplot.title('Insufficient number of points')
 
     pyplot.legend()
-    return pyplot.show()
+    pyplot.show()
+    return 0
 
 if __name__ == '__main__':
     exit(main())
