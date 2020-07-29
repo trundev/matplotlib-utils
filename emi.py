@@ -8,35 +8,33 @@ import matplotlib.pyplot as pyplot
 import matplotlib.widgets as widgets
 import mpl_toolkits.mplot3d as mplot3d
 import emi_calc
+import coils
 
 # Source current flow
 SRC_Z_STEP = 0.01
-SOURCE_POLYLINE = [
-   [0., 0., 0 * SRC_Z_STEP],
-   [1., 0., 1 * SRC_Z_STEP],    # right
-   [1., 2., 2 * SRC_Z_STEP],    # up
-   [0., 2., 3 * SRC_Z_STEP],    # left
-   [0., 0., 4 * SRC_Z_STEP],    # down
-]
+rad, turns, segs = .5, 1, 4
+SOURCE_POLYLINE = coils.helix_coil(rad / numpy.cos(numpy.pi / segs), turns, turns * segs * SRC_Z_STEP, segs)
+SOURCE_POLYLINE[...,1] *= 2    # Double scale Y axis
+del rad, turns, segs
 # Points to calculate induction vectors
-TGT_Y_POS = 1
+TGT_Y_POS = 0
 TGT_ROW_STEPS = 8
 TARGET_POINTS = [
     # Top row
     *(
-        [x, TGT_Y_POS, 1] for x in numpy.linspace(-.5, 1.5, num=TGT_ROW_STEPS, endpoint=False)
+        [x, TGT_Y_POS, 1] for x in numpy.linspace(-1., 1., num=TGT_ROW_STEPS, endpoint=False)
      ),
     # Right row
     *(
-        [1.5, TGT_Y_POS, z] for z in numpy.linspace(1, -1, num=TGT_ROW_STEPS, endpoint=False)
+        [1., TGT_Y_POS, z] for z in numpy.linspace(1, -1, num=TGT_ROW_STEPS, endpoint=False)
      ),
     # Bottom row
     *(
-        [x, TGT_Y_POS, -1] for x in numpy.linspace(1.5, -.5, num=TGT_ROW_STEPS, endpoint=False)
+        [x, TGT_Y_POS, -1] for x in numpy.linspace(1., -1., num=TGT_ROW_STEPS, endpoint=False)
      ),
     # Left row
     *(
-        [-.5, TGT_Y_POS, z] for z in numpy.linspace(-1, 1, num=TGT_ROW_STEPS, endpoint=False)
+        [-1., TGT_Y_POS, z] for z in numpy.linspace(-1, 1, num=TGT_ROW_STEPS, endpoint=False)
      ),
 ]
 # Planar grid between [-.5, TGT_Y_POS, -1] and [1.5, TGT_Y_POS, 1]
@@ -47,7 +45,7 @@ TARGET_POINTS = [
 #).reshape((-1,3))
 
 # Slider origin/direction parameters
-SOURCE_SLIDER_ORG = [0.5, 1, 0]
+SOURCE_SLIDER_ORG = [0, 0, 0]
 TARGET_SLIDER_DIR = [0, 1, 0]
 SOURCE_SLIDER_DIR = [1, 1, 1]
 

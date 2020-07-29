@@ -5,6 +5,7 @@ import numpy
 import matplotlib.pyplot as pyplot
 import mpl_toolkits.mplot3d as mplot3d
 import emi_calc
+import coils
 
 
 U_MAX = 10
@@ -15,15 +16,11 @@ MAX_ITERATIONS = 10
 # Source current flow
 #
 SRC_Z_STEP = 0  # 0.01
-SOURCE_POLYLINE = [
-   [0., 0., 0 * SRC_Z_STEP],
-   [1., 0., 1 * SRC_Z_STEP],    # right
-   [1., 1., 2 * SRC_Z_STEP],    # up
-   [0., 1., 3 * SRC_Z_STEP],    # left
-   [0., 0., 4 * SRC_Z_STEP],    # down
-]
+rad, turns, segs = .5, 1, 4
+SOURCE_POLYLINE = coils.helix_coil(rad / numpy.cos(numpy.pi / segs), turns, turns * segs * SRC_Z_STEP, segs)
 
-BASE_POINT = [0.5, -.1, .0]
+BASE_POINT = [rad + .1, .0, .0]
+del rad, turns, segs
 
 #
 # From emi.py

@@ -9,24 +9,20 @@ import matplotlib.pyplot as pyplot
 import matplotlib.widgets as widgets
 import mpl_toolkits.mplot3d as mplot3d
 import emi_calc
+import coils
 
 #
 # EM source current flow
 #
 # Helmholtz coils (two parallel circles at distance of R)
 rad = 1.
-phi = numpy.linspace(-numpy.pi, numpy.pi, num=9, endpoint=True)
-SOURCE_POLYLINE = [
-    [rad * numpy.cos(phi), rad * numpy.sin(phi), phi.size * [rad/2]],
-    [rad * numpy.cos(phi), rad * numpy.sin(phi), phi.size * [-rad/2]],
-]
-SOURCE_POLYLINE = numpy.transpose(SOURCE_POLYLINE, (0,2,1))
+SOURCE_POLYLINE = coils.helmholtz_coil(rad)
 
 #
 # Initial surface point
 #
 SEED_POINT = [2*rad, 0, 0]
-del rad, phi
+del rad
 
 INITIAL_STEP_SCALE = .25
 # Approximation precision
