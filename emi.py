@@ -14,22 +14,45 @@ import em_inductance
 #em_inductance.NUM_SPLITS = 1
 
 # Source current flow, see coils.gen_coil() arguments: (rad0, rad1, turns, len, separate, segs, center)
-GEN_COIL_PARAMS = (1., 1., 2, .1, False, 4)
-COIL_PARAM_CHANGE_XFORMS = (None, None, (1,0), (1,0))   # Zero based scale transform on turns and len
-print("Coil params:", GEN_COIL_PARAMS, ", change xforms:", COIL_PARAM_CHANGE_XFORMS)
+src_rad, src_turns, segs = 1., 1, 8
+tgt_rad, tgt_turns, height, testpts = src_rad*.8, .5, 1, 4
 
+# Circle
+GEN_COIL_PARAMS = (src_rad, src_rad, src_turns, 0, False, segs)
+COIL_PARAM_CHANGE_XFORMS = ((1,0), (1,0))   # Zero based scale transform on radius
 SOURCE_POLYLINE = coils.gen_coil(*GEN_COIL_PARAMS)
 
-# See also http://electronbunker.ca/eb/Calculators.html
-
 # Points to calculate induction vectors
-TGT_YZ_POS = 0, 0
-TGT_ROW_STEPS = 3
-TARGET_POINTS = numpy.linspace([.6, *TGT_YZ_POS], [.8, *TGT_YZ_POS], num=TGT_ROW_STEPS, endpoint=True)
+def linspace_append(points, dir, abs=False, num=testpts):
+    npts = numpy.array(dir) if abs else points[-1] + dir
+    npts = numpy.linspace(npts, points[-1], num=num, endpoint=False)
+    return numpy.concatenate((points, numpy.flip(npts, axis=0)))
+
+# Half circle, and...
+TARGET_POINTS = coils.helix_coil(tgt_rad, tgt_turns, 0, segs)
+# Y mirror
+TARGET_POINTS[...,1] = -TARGET_POINTS[...,1]
+pt = TARGET_POINTS[-1].copy()
+# Z shift
+TARGET_POINTS = linspace_append(TARGET_POINTS, [0,0,height], False)
+# Goto XY origin
+TARGET_POINTS = linspace_append(TARGET_POINTS, [0,0,height], True)
+# Goto origin
+TARGET_POINTS = linspace_append(TARGET_POINTS, [0,0,0], True)
+# Close loop
+TARGET_POINTS = linspace_append(TARGET_POINTS, TARGET_POINTS[0], True)
+
+del src_rad, src_turns, segs
+del tgt_rad, tgt_turns, height, testpts
+
+# Visualize target contour
+if False:
+    SOURCE_POLYLINE = numpy.concatenate((SOURCE_POLYLINE, TARGET_POINTS))
 
 # Slider origin/direction parameters
+TARGET_SLIDER_ORG = [0, 0, 0]
 SOURCE_SLIDER_ORG = [0, 0, 0]
-TARGET_SLIDER_DIR = [0, 0, 1]
+TARGET_SLIDER_DIR = [1, 1, 0]
 SOURCE_SLIDER_DIR = [1, 1, 1]
 
 FIELD_SCALE = .2
@@ -141,11 +164,8 @@ class main_data:
         # Inductance
         inductance = None
         if True:
-            # Calculate self-inductance, but target is shifted by the slider
-            tgt_lines = src_lines.copy()
-            tgt_slider_pos = tgt_pts[...,0,:] - numpy.array(TARGET_POINTS)[...,0,:]
-            tgt_lines[...,:] += tgt_slider_pos
-            inductance, ind_emi_params, ind_emf_vecs = em_inductance.inductance(src_lines, tgt_lines)
+            # Calculate self-inductance
+            inductance, ind_emi_params, ind_emf_vecs = em_inductance.inductance(src_lines)
 
             # Append to already calculated parameters (must flatten to allow concatenate)
             emi_params = numpy.concatenate((emi_params.flatten(), ind_emi_params.flatten()))
@@ -310,9 +330,8 @@ def main(argv):
     rect = [AX_BTN_WIDTH, 0 * AX_BTN_HEIGHT / AX_NUM_SLIDERS,
             1 - AX_BTN_WIDTH, AX_BTN_HEIGHT / AX_NUM_SLIDERS]
     rax = pyplot.axes(deflate_rect(rect, AX_TEXT_WIDTH + AX_MARGIN))
-    tgt_slider = widgets.Slider(rax, data.tgt_coll.get_label(), -2, 2, 0)
-    tgt_slider.on_changed(tgt_changed(data, move_changed(TARGET_SLIDER_DIR)))
-
+    tgt_slider = widgets.Slider(rax, data.tgt_coll.get_label(), -1, 2, 1)
+    tgt_slider.on_changed(tgt_changed(data, scale_changed(TARGET_SLIDER_DIR, TARGET_SLIDER_ORG)))
 
     ax.legend()
     pyplot.show()
