@@ -102,6 +102,19 @@ def replace_collection(old, new):
         new.set_visible(visible)
     return new
 
+def rotate_points(pts, axis, angle):
+    # Shift the axes, to move the 'axis' to Z
+    axis += 1
+    pts = numpy.roll(pts, pts.shape[-1] - axis, axis=-1)
+
+    # Perform 2D rotation on (pt[0], pt[1])
+    x = pts[...,0] * numpy.cos(angle) - pts[...,1] * numpy.sin(angle)
+    y = pts[...,0] * numpy.sin(angle) + pts[...,1] * numpy.cos(angle)
+    pts[...,0], pts[...,1] = x, y
+
+    # Shift-back axes
+    return numpy.roll(pts, axis, axis=-1)
+
 def deflate_rect(rect, hor_margin=AX_MARGIN, vert_margin=AX_MARGIN):
     """Deflate matplotlib rectangle [left, bottom, right, top]"""
     rect[0] += hor_margin
@@ -194,31 +207,53 @@ class on_clicked:
         pyplot.draw()
 
 class src_changed:
-    def __init__(self, data, origin):
+    def __init__(self, data, func):
         self.data = data
-        self.origin = origin
+        self.func = func
 
     def __call__(self, pos):
-        src_lines = numpy.array(SOURCE_POLYLINE)
-        pos = numpy.ones(3) + numpy.array(SOURCE_SLIDER_DIR) * (pos - 1)
-        for idx, pt in enumerate(src_lines):
-            src_lines[idx] = (pt - self.origin) * pos + self.origin
-
-        self.data.redraw(src_lines, None)
+        if self.func is None:
+            self.data.redraw(None, None, pos)
+        else:
+            pts = numpy.array(SOURCE_POLYLINE)
+            pts = self.func(pts, pos)
+            self.data.redraw(pts, None)
         pyplot.draw()
 
 class tgt_changed:
-    def __init__(self, data, move_dir):
+    def __init__(self, data, func):
         self.data = data
-        self.move_dir = move_dir
+        self.func = func
 
     def __call__(self, pos):
-        tgt_pts = numpy.array(TARGET_POINTS)
-        for idx, _ in enumerate(tgt_pts):
-            tgt_pts[idx] += self.move_dir * pos
-
-        self.data.redraw(None, tgt_pts)
+        pts = numpy.array(TARGET_POINTS)
+        pts = self.func(pts, pos)
+        self.data.redraw(None, pts)
         pyplot.draw()
+
+class move_changed:
+    def __init__(self, move_dir):
+        self.move_dir = numpy.array(move_dir)
+
+    def __call__(self, pts, pos):
+        return pts + self.move_dir * pos
+
+class rotate_changed:
+    def __init__(self, rot_axis, origin):
+        self.origin = numpy.array(origin)
+        self.rot_axis = rot_axis
+
+    def __call__(self, pts, pos):
+        return rotate_points(pts - self.origin, self.rot_axis, pos) + self.origin
+
+class scale_changed:
+    def __init__(self, scale_dir, origin):
+        self.scale_dir = numpy.array(scale_dir)
+        self.origin = numpy.array(origin)
+
+    def __call__(self, pts, pos):
+        pos = numpy.ones(3) + self.scale_dir * (pos - 1)
+        return (pts - self.origin) * pos + self.origin
 
 def main(argv):
     """Main entry"""
@@ -246,14 +281,14 @@ def main(argv):
             1 - AX_BTN_WIDTH, AX_BTN_HEIGHT / AX_NUM_SLIDERS]
     rax = pyplot.axes(deflate_rect(rect, AX_TEXT_WIDTH + AX_MARGIN))
     src_slider = widgets.Slider(rax, data.src_coll.get_label(), 0, 2, 1)
-    src_slider.on_changed(src_changed(data, numpy.array(SOURCE_SLIDER_ORG)))
+    src_slider.on_changed(src_changed(data, scale_changed(SOURCE_SLIDER_DIR, SOURCE_SLIDER_ORG)))
 
     # Slider to move target points (slider 2)
     rect = [AX_BTN_WIDTH, 0 * AX_BTN_HEIGHT / AX_NUM_SLIDERS,
             1 - AX_BTN_WIDTH, AX_BTN_HEIGHT / AX_NUM_SLIDERS]
     rax = pyplot.axes(deflate_rect(rect, AX_TEXT_WIDTH + AX_MARGIN))
     tgt_slider = widgets.Slider(rax, data.tgt_coll.get_label(), -2, 2, 0)
-    tgt_slider.on_changed(tgt_changed(data, numpy.array(TARGET_SLIDER_DIR)))
+    tgt_slider.on_changed(tgt_changed(data, move_changed(TARGET_SLIDER_DIR)))
 
 
     ax.legend()
