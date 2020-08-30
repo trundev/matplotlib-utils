@@ -24,7 +24,11 @@ def build_jacobian(l_comp, R_comp, l_vect, R_vect, B_vect):
             R_vect / R_len,
             B_vect / B_len
         )).T
-    xform_inv = numpy.linalg.inv(xform)
+    try:
+        xform_inv = numpy.linalg.inv(xform)
+    except numpy.linalg.LinAlgError as ex:
+        print('Exception:', ex, file=sys.stderr)
+        return None
     return numpy.matmul(xform, numpy.matmul(jacob.T, xform_inv)).T
 
 def calc_emi_dif(tgt_pt, src_pt, src_dir, coef=1):
@@ -167,6 +171,8 @@ def calc_emi(tgt_pt, src_pt, src_dir, coef=1):
         return None     # Target point lies on the source line
 
     B = (vect1 - vect0) / R_len2
+    if numpy.all(B == 0):
+        return None     # B is zero (target point is almost along the source line)
 
     # Scale by a coefficient, like current, magnetic constant and 1/(4*pi)
     B *= coef
@@ -284,7 +290,8 @@ def calc_all_emis(tgt_pts, src_lines, coef=1):
     for emi_pars in emi_it:
         for src_pt, src_dir in zip(src_pts, src_dirs):
             emi = calc_emi(emi_pars['pt'], src_pt, src_dir, coef)
-            if emi is not None:     # Ignore point collinear to the src-line
+            # Ignore points collinear to the src-line and where jacobian failed
+            if emi is not None and emi[1] is not None:
                 if numpy.isnan(emi_pars['B']).all():
                     emi_pars['B'] = 0
                 if numpy.isnan(emi_pars['jacob']).all():
@@ -292,6 +299,8 @@ def calc_all_emis(tgt_pts, src_lines, coef=1):
 
                 emi_pars['B'] += emi[0]
                 emi_pars['jacob'] += emi[1]
+            else:
+                print('Warning: EMI failed at %d: tgt=%s, src=%s->%s'%(emi_it.iterindex, emi_pars['pt'], src_pt, src_dir), file=sys.stderr)
 
     # Obtain 'gradB' from Jacobian matrix
     emi_it = numpy.nditer(emi_params, op_flags=[['readwrite']])
