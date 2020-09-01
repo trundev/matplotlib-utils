@@ -38,7 +38,7 @@ TANGENTS_FMT = {'color': 'magenta', 'linestyle': '--', 'label': 'Tangents'}
 NORMALS_FMT = {'color': 'blue', 'linestyle': '-', 'label': 'Normals'}
 POINT_FMT   = {'color': 'magenta', 'marker': '.', 'visible': False, 'label': 'Points'}
 # Note: Axes3D.plot_surface() crashes when label does start with underscore!?!
-SURFACE_FMT = {'cmap': 'viridis', 'edgecolor': 'none', 'alpha': .5, 'label': '_Surface'}
+SURFACE_FMT = {'cmap': 'viridis', 'color':'greenyellow', 'edgecolor': 'none', 'alpha': .5, 'label': '_Surface'}
 
 AX_MARGIN = .01
 SLIDER_HOR_MARGIN = .1
@@ -273,7 +273,14 @@ def plot_geometry(ax, seed_pt, extent_uv, scale, normal_fn, *params, **kw_params
         colls.append( ax.scatter(*surface.T, **POINT_FMT))
 
     if SURFACE_FMT:
-        colls.append( ax.plot_surface(*surface.T, **SURFACE_FMT))
+        # Plot surface or polyline
+        if min(surface.shape[:2]) > 1:
+            colls.append( ax.plot_surface(*surface.T, **SURFACE_FMT))
+        else:
+            fmt = SURFACE_FMT.copy()
+            del fmt['edgecolor'], fmt['cmap']
+            pts = surface.reshape(-1, surface.shape[-1])
+            colls.append( ax.plot(*pts.T, **fmt)[0])
     return colls
 
 #

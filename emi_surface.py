@@ -40,7 +40,7 @@ def plot_source(ax, src_lines):
 gradB_FMT['linestyle']='-'
 FAIL_FMT = dict(color='red', marker='o', label='Failure')
 WARNING_FMT = dict(color='orange', marker='o', label='Warning')
-SURFACE_FMT = dict(cmap='viridis', edgecolor='none', alpha=.5)
+SURFACE_FMT = dict(cmap='viridis', color='greenyellow', edgecolor='none', alpha=.5)
 
 #
 # Equipotential surface approximation
@@ -55,9 +55,13 @@ def equipotential_surface(base_pt, src_lines, tolerance=.01):
     info = numpy.zeros(surface.shape, dtype=[('iter', numpy.int)])
     base_B = base_params['B']
     base_B_len = numpy.sqrt(base_B.dot(base_B))
+    print('Base pt [%.3f, %.3f, %.3f]: B %.3f [%.3f, %.3f, %.3f]'%(*base_pt, base_B_len, *base_B))
+
+    # Center point
+    center_pt = (src_lines[...,1:,:] + src_lines[...,:-1,:]) / 2
+    center_pt = center_pt.sum(tuple(range(center_pt.ndim - 1))) / center_pt[...,0].size
 
     # Step parameters
-    center_pt = src_lines.sum(0) / src_lines.shape[0]
     revolution = 2 * numpy.pi
     tan_phi = numpy.tan(revolution / 3 / U_MAX)
     tan_psi = numpy.tan(revolution / 3 / V_MAX)
@@ -81,15 +85,16 @@ def equipotential_surface(base_pt, src_lines, tolerance=.01):
                 B_len = numpy.sqrt(B.dot(B))
                 dB = base_B_len - B_len
                 if abs(dB) < tolerance * base_B_len:
+                    print('  pt [%.3f, %.3f, %.3f]: B %.3f [%.3f, %.3f, %.3f]'%(*pt, B_len, *B))
                     surface[v, u] = emi_params
                     info[v, u]['iter'] = iter + 1
                     fail = False
                     break
 
+                print('  > pt [%.3f, %.3f, %.3f]: dB %.3f (%.1f%%)'%(*pt, dB, dB / base_B_len * 100))
                 # Location correction: "dB / |gradB|" along the normalized "gradB"
                 # Optimize this by using "dr_dI": dr_dI = |B| . gradB / |gradB|^2
                 pt += dB / B_len * dr_dI
-                print('  pt', pt, 'dB', dB, '(%.1f%%)'%(dB / base_B_len * 100))
 
             if fail:
                 print('Error: Unable to find B', B, ' around', pt, file=sys.stderr)
@@ -217,7 +222,8 @@ def main(base_pt, src_lines):
     ax.scatter(*pts_warns.transpose(), **WARNING_FMT)
 
     # Resize B and grad B to fit screen (ignore NaN-s)
-    src_max = vect_lens(src_lines.max(0) - src_lines.min(0))
+    axes = tuple(range(src_lines.ndim - 1))
+    src_max = vect_lens(src_lines.max(axes) - src_lines.min(axes))
     B_max = numpy.nanmax(vect_lens(B_vecs))
     gradB_max = numpy.nanmax(vect_lens(gradB_vecs))
     # Scale field vectors to 1/20 of source lines
@@ -232,7 +238,13 @@ def main(base_pt, src_lines):
     gradB_vecs = gradB_vecs.transpose()
     ax.quiver(*pts, *B_vecs, **B_FMT)
     ax.quiver(*pts, *gradB_vecs, **gradB_FMT)
-    ax.plot_surface(*pts, **SURFACE_FMT)
+    # Plot surface or polyline
+    if min(pts.shape[1:]) > 1:
+        ax.plot_surface(*pts, **SURFACE_FMT)
+    else:
+        del SURFACE_FMT['edgecolor'], SURFACE_FMT['cmap']
+        pts = pts.reshape(pts.shape[0], -1)
+        ax.plot(*pts, **SURFACE_FMT)
 
     ax.set_title('Equipotential surface')
     ax.legend()
