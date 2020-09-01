@@ -9,17 +9,23 @@ import matplotlib.widgets as widgets
 import mpl_toolkits.mplot3d as mplot3d
 import emi_calc
 import coils
+import em_inductance
+
+#em_inductance.NUM_SPLITS = 1
 
 # Source current flow, see coils.gen_coil() arguments: (rad0, rad1, turns, len, separate, segs, center)
-GEN_COIL_PARAMS = (1., 1., 2, .04, False, 4)
+GEN_COIL_PARAMS = (1., 1., 2, .1, False, 4)
 COIL_PARAM_CHANGE_XFORMS = (None, None, (1,0), (1,0))   # Zero based scale transform on turns and len
+print("Coil params:", GEN_COIL_PARAMS, ", change xforms:", COIL_PARAM_CHANGE_XFORMS)
 
 SOURCE_POLYLINE = coils.gen_coil(*GEN_COIL_PARAMS)
 
+# See also http://electronbunker.ca/eb/Calculators.html
+
 # Points to calculate induction vectors
 TGT_YZ_POS = 0, 0
-TGT_ROW_STEPS = 8
-TARGET_POINTS = numpy.linspace([-1, *TGT_YZ_POS], [1, *TGT_YZ_POS], num=TGT_ROW_STEPS, endpoint=True)
+TGT_ROW_STEPS = 3
+TARGET_POINTS = numpy.linspace([.6, *TGT_YZ_POS], [.8, *TGT_YZ_POS], num=TGT_ROW_STEPS, endpoint=True)
 
 # Slider origin/direction parameters
 SOURCE_SLIDER_ORG = [0, 0, 0]
@@ -130,13 +136,30 @@ class main_data:
 
         # Calculate EMI parameters B and dB for each target point
         emi_params = emi_calc.calc_all_emis(tgt_pts, src_lines, coef)
+        emf_vecs = numpy.cross(emi_params['dr_dI'], emi_params['B'])
+
+        # Inductance
+        inductance = None
         if True:
-            print("Calculated EMI parameters for %d target points:"%tgt_pts[...,0].size)
+            # Calculate self-inductance, with slightly adjusted target
+            tgt_lines = src_lines.copy()
+            # Shift toward/away Z axis by a minimal value to avoid EMI failures
+            tgt_lines[...,:2] *= 1 - 1e-2   # + 1e-2
+            # Additional shift by the slider
+            tgt_slider_pos = tgt_pts[...,0,:] - numpy.array(TARGET_POINTS)[...,0,:]
+            tgt_lines[...,:] += tgt_slider_pos
+            inductance, ind_emi_params, ind_emf_vecs = em_inductance.inductance(src_lines, tgt_lines)
+
+            # Append to already calculated parameters (must flatten to allow concatenate)
+            emi_params = numpy.concatenate((emi_params.flatten(), ind_emi_params.flatten()))
+            emf_vecs = numpy.concatenate((emf_vecs.reshape(-1, 3), ind_emf_vecs.reshape(-1, 3)))
+
+        if True:
+            print("Calculated EMI parameters for %d target points:"%emi_params['pt'][...,0].size)
             pts = emi_params['pt']
             B_vecs = emi_params['B']
             gradB_vecs = emi_params['gradB']
             dr_dI_vecs = emi_params['dr_dI']
-            emf_vecs = numpy.cross(dr_dI_vecs, B_vecs)
             print("\t[x, y, z]: B-len / gradB-len [x, y, z] / dr_dI-len / emf-len")
             print("\t------------------------------------------------------------")
             for pt, bl, gb, gbl, drl, emfl in zip(
@@ -149,6 +172,10 @@ class main_data:
                     ):
                 print('\t[%+.3f, %+.3f, %+.3f]: %.3f / %.3f [%+.3f, %+.3f, %+.3f] / %.3f / %.3f'%(
                         *pt, bl, gbl, *gb, drl, emfl))
+
+        # Inductance results
+        if inductance is not None:
+            print("Inductance:", inductance.sum(-1), ", pts:", inductance.size, ", min/max:", inductance.min(), inductance.max())
 
         pts = emi_params['pt'].transpose()
 
@@ -164,8 +191,7 @@ class main_data:
 
         # The EMF induced because of field change
         if EMF_FMT:
-            emf = numpy.cross(emi_params['dr_dI'], emi_params['B'])
-            emf = emf.dot(EMF_SCALE).transpose()
+            emf = emf_vecs.dot(EMF_SCALE).transpose()
             self.emf_coll = replace_collection(self.emf_coll, self.ax.quiver(*pts, *emf, **EMF_FMT))
         return True
 
