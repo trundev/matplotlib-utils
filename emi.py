@@ -10,43 +10,20 @@ import mpl_toolkits.mplot3d as mplot3d
 import emi_calc
 import coils
 
-# Source current flow
-SRC_Z_STEP = 0.01
-rad, turns, segs = .5, 1, 4
-SOURCE_POLYLINE = coils.helix_coil(rad / numpy.cos(numpy.pi / segs), turns, turns * segs * SRC_Z_STEP, segs)
-SOURCE_POLYLINE[...,1] *= 2    # Double scale Y axis
-del rad, turns, segs
+# Source current flow, see coils.gen_coil() arguments: (rad0, rad1, turns, len, separate, segs, center)
+GEN_COIL_PARAMS = (1., 1., 2, .04, False, 4)
+COIL_PARAM_CHANGE_XFORMS = (None, None, (1,0), (1,0))   # Zero based scale transform on turns and len
+
+SOURCE_POLYLINE = coils.gen_coil(*GEN_COIL_PARAMS)
+
 # Points to calculate induction vectors
-TGT_Y_POS = 0
+TGT_YZ_POS = 0, 0
 TGT_ROW_STEPS = 8
-TARGET_POINTS = [
-    # Top row
-    *(
-        [x, TGT_Y_POS, 1] for x in numpy.linspace(-1., 1., num=TGT_ROW_STEPS, endpoint=False)
-     ),
-    # Right row
-    *(
-        [1., TGT_Y_POS, z] for z in numpy.linspace(1, -1, num=TGT_ROW_STEPS, endpoint=False)
-     ),
-    # Bottom row
-    *(
-        [x, TGT_Y_POS, -1] for x in numpy.linspace(1., -1., num=TGT_ROW_STEPS, endpoint=False)
-     ),
-    # Left row
-    *(
-        [-1., TGT_Y_POS, z] for z in numpy.linspace(-1, 1, num=TGT_ROW_STEPS, endpoint=False)
-     ),
-]
-# Planar grid between [-.5, TGT_Y_POS, -1] and [1.5, TGT_Y_POS, 1]
-#TARGET_POINTS = numpy.linspace(
-#    numpy.linspace([-.5, TGT_Y_POS, -1], [1.5, TGT_Y_POS, -1], num=TGT_ROW_STEPS),
-#    numpy.linspace([-.5, TGT_Y_POS,  1], [1.5, TGT_Y_POS,  1], num=TGT_ROW_STEPS),
-#    num=TGT_ROW_STEPS
-#).reshape((-1,3))
+TARGET_POINTS = numpy.linspace([-1, *TGT_YZ_POS], [1, *TGT_YZ_POS], num=TGT_ROW_STEPS, endpoint=True)
 
 # Slider origin/direction parameters
 SOURCE_SLIDER_ORG = [0, 0, 0]
-TARGET_SLIDER_DIR = [0, 1, 0]
+TARGET_SLIDER_DIR = [0, 0, 1]
 SOURCE_SLIDER_DIR = [1, 1, 1]
 
 FIELD_SCALE = .2
@@ -60,8 +37,8 @@ AX_NUM_SLIDERS = 2
 
 SOURCE_FMT = dict(color='green', label='Source')
 TARGET_FMT = dict(color='blue', marker='+', label='Target')
-B_FMT = dict(color='magenta', linestyle='--', label='Field')
-GRADB_FMT = dict(color='yellow', linestyle=':', label='Field gradient')
+B_FMT = dict(color='magenta', linestyle='--', label='Field', visible=False)
+GRADB_FMT = dict(color='yellow', linestyle=':', label='Field gradient', visible=False)
 EMF_FMT = dict(color='red', linestyle='-.', label='EM Force')
 
 # From https://stackoverflow.com/questions/13685386/matplotlib-equal-unit-length-with-equal-aspect-ratio-z-axis-is-not-equal-to
@@ -255,6 +232,29 @@ class scale_changed:
         pos = numpy.ones(3) + self.scale_dir * (pos - 1)
         return (pts - self.origin) * pos + self.origin
 
+class coil_param_changed:
+    def __init__(self, args, xforms):
+        self.args = [*args]
+        self.xforms = xforms
+
+    def __call__(self, pts, pos):
+        args = self.args.copy()
+        for idx, xform in enumerate(self.xforms):
+            if xform is not None:
+                if xform[0]:
+                    # Scale
+                    args[idx] = xform[0] * (args[idx] - xform[1]) * pos  + xform[1]
+                else:
+                    # Translate
+                    args[idx] += xform[1] * pos
+                # The values specified as int, will be kept integer (i.e. "2" vs. "2.")
+                if isinstance(self.args[idx], int):
+                    args[idx] = round(args[idx])
+        print('Generated coil:',
+                ', '.join('%s=%s'%(n,v) for n,v in
+                    zip(('rad0', 'rad1', 'turns', 'len', 'separate', 'segs', 'center'), args)) )
+        return coils.gen_coil(*args)
+
 def main(argv):
     """Main entry"""
     fig = pyplot.figure()
@@ -281,7 +281,7 @@ def main(argv):
             1 - AX_BTN_WIDTH, AX_BTN_HEIGHT / AX_NUM_SLIDERS]
     rax = pyplot.axes(deflate_rect(rect, AX_TEXT_WIDTH + AX_MARGIN))
     src_slider = widgets.Slider(rax, data.src_coll.get_label(), 0, 2, 1)
-    src_slider.on_changed(src_changed(data, scale_changed(SOURCE_SLIDER_DIR, SOURCE_SLIDER_ORG)))
+    src_slider.on_changed(src_changed(data, coil_param_changed(GEN_COIL_PARAMS, COIL_PARAM_CHANGE_XFORMS)))
 
     # Slider to move target points (slider 2)
     rect = [AX_BTN_WIDTH, 0 * AX_BTN_HEIGHT / AX_NUM_SLIDERS,
