@@ -141,11 +141,8 @@ class main_data:
         # Inductance
         inductance = None
         if True:
-            # Calculate self-inductance, with slightly adjusted target
+            # Calculate self-inductance, but target is shifted by the slider
             tgt_lines = src_lines.copy()
-            # Shift toward/away Z axis by a minimal value to avoid EMI failures
-            tgt_lines[...,:2] *= 1 - 1e-2   # + 1e-2
-            # Additional shift by the slider
             tgt_slider_pos = tgt_pts[...,0,:] - numpy.array(TARGET_POINTS)[...,0,:]
             tgt_lines[...,:] += tgt_slider_pos
             inductance, ind_emi_params, ind_emf_vecs = em_inductance.inductance(src_lines, tgt_lines)
