@@ -1,0 +1,34 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Math to image",
+			"type": "process",
+			"command": "py",
+			"args":[
+				"${workspaceFolder}/docs/math2img.py",
+				"${file}",
+			],
+			"group": "build",
+			"presentation": {
+				"reveal": "always",
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Math to image (delete)",
+			"type": "process",
+			"command": "py",
+			"args":[
+				"${workspaceFolder}/docs/math2img.py",
+				"-d",
+				"${file}",
+			],
+			"group": "build",
+			"presentation": {
+				"reveal": "always",
+			},
+			"problemMatcher": []
+		}
+	]
+}
