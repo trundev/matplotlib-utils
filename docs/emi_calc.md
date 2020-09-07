@@ -2,7 +2,7 @@
 This source is edited with VSCode, with help of:
 - "Markdown+Math" (vscode:extension/goessner.mdmath) -- Preview during editing
 - "Markdown Preview Github Styling" (vscode:extension/bierner.markdown-preview-github-styles) -- Match GitHub style
-- Task "Masth to image" (docs/math2img.py) -- Generate markdown-image tag URLs from LaTeX math expressions
+- Task "Math to image" (docs/math2img.py) -- Generate markdown-image tag URLs from LaTeX math expressions
 -->
 # Math behind EMI calculations
 
@@ -61,6 +61,10 @@ The parameter to describe the EM field caused by current along line **L**, to a 
 - Magnetic field Jacobian matrix ```emi_params['jacob']```:
 
  ![$$\mathbf J_B = \frac{\partial \vec{B}}{\partial \vec{r}} = \begin{bmatrix} \dfrac {\partial B_x}{\partial r_x} & \dfrac {\partial B_x}{\partial r_y} & \dfrac {\partial B_x}{\partial r_z} \\ \dfrac {\partial B_y}{\partial r_x} & \dfrac {\partial B_y}{\partial r_y} & \dfrac {\partial B_y}{\partial r_z} \\ \dfrac {\partial B_z}{\partial r_x} & \dfrac {\partial B_z}{\partial r_y} & \dfrac {\partial B_z}{\partial r_z}\end{bmatrix}$$](https://render.githubusercontent.com/render/math?math=%5Cmathbf%20J_B%20%3D%20%5Cfrac%7B%5Cpartial%20%5Cvec%7BB%7D%7D%7B%5Cpartial%20%5Cvec%7Br%7D%7D%20%3D%20%5Cbegin%7Bbmatrix%7D%20%5Cdfrac%20%7B%5Cpartial%20B_x%7D%7B%5Cpartial%20r_x%7D%20%26%20%5Cdfrac%20%7B%5Cpartial%20B_x%7D%7B%5Cpartial%20r_y%7D%20%26%20%5Cdfrac%20%7B%5Cpartial%20B_x%7D%7B%5Cpartial%20r_z%7D%20%5C%5C%20%5Cdfrac%20%7B%5Cpartial%20B_y%7D%7B%5Cpartial%20r_x%7D%20%26%20%5Cdfrac%20%7B%5Cpartial%20B_y%7D%7B%5Cpartial%20r_y%7D%20%26%20%5Cdfrac%20%7B%5Cpartial%20B_y%7D%7B%5Cpartial%20r_z%7D%20%5C%5C%20%5Cdfrac%20%7B%5Cpartial%20B_z%7D%7B%5Cpartial%20r_x%7D%20%26%20%5Cdfrac%20%7B%5Cpartial%20B_z%7D%7B%5Cpartial%20r_y%7D%20%26%20%5Cdfrac%20%7B%5Cpartial%20B_z%7D%7B%5Cpartial%20r_z%7D%5Cend%7Bbmatrix%7D)
+
+
+A detailed description of how these parameters are calculated can be found here: [differential](emi_calc-dif.md)
+and [integral](emi_calc-int.md) calculation routines.
 
 
 ### Derived parameters
