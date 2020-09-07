@@ -10,7 +10,7 @@ def build_jacobian(l_comp, R_comp, l_vect, R_vect, B_vect):
     l_len = numpy.sqrt((l_vect * l_vect).sum(-1))
     R_len = numpy.sqrt((R_vect * R_vect).sum(-1))
     B_len = numpy.sqrt((B_vect * B_vect).sum(-1))
-    # Empty 3x3 jacobian matrix
+    # Empty 3x3 Jacobian matrix
     jacob = numpy.zeros((B_vect.shape[-1], B_vect.shape[-1]), B_vect.dtype)
 
     # This is in the space with a standard basis along the "l", "R" and "B" axes
@@ -60,7 +60,7 @@ def calc_emi_dif(tgt_pt, src_pt, src_dir, coef=1):
         return None     # Target point coincides with "src_pt"
 
     # Calculate the differential Biot–Savart law (https://en.wikipedia.org/wiki/Biot–Savart_law):
-    # dl x r / r^3
+    # v x r / r^3
     B = numpy.cross(src_dir, r) / r_len ** 3
 
     # Scale by a coefficient, like current, magnetic constant and 1/(4*pi)
@@ -73,25 +73,24 @@ def calc_emi_dif(tgt_pt, src_pt, src_dir, coef=1):
 
     # Gradient component along 'l':
     # Use derivative calculator https://www.derivative-calculator.net/ (substitute l with x):
-    #   input: R / sqrt(x^2 + R^2)^3, result: -3Rx / (x^2 + R^2)^(5/2)
-    # Substitute back x to l, then sqrt(l^2 + R^2) to r:
-    #   result: -3 * R * l / r^5
+    #   input: d/dx[ v*R / sqrt(x^2 + R^2)^3 ]
+    #   result: -3*R*v*x / (x^2 + R^2)^(5/2)
+    # Substitute back x to l, then sqrt(l^2 + R^2) to r_len:
+    #       -3*R*v*l / r_len^5
     R_len2 = R.dot(R)
     l_len2 = l.dot(l)
     R_len = numpy.sqrt(R_len2)
-    l_len = numpy.sqrt(l_len2)
-    if l.dot(src_dir) < 0:
-        l_len = -l_len
 
-    l_comp = -3 * R_len * l_len / r_len ** 5
+    l_comp = -3 * R_len * l.dot(src_dir) / r_len ** 5
 
     # Gradient component along 'R':
     # Use derivative calculator https://www.derivative-calculator.net/ (substitute R with x):
-    #   input: x / sqrt(x^2 + l^2)^3, result: - (2x^2 - l^2) / (x^2 + l^2)^(5/2)
-    # Substitute back x to R, then sqrt(l^2 + R^2) to r:
-    #   result: (l^2 - 2R^2) / r^5
+    #   input: d/dx[ v*x / sqrt(x^2 + l^2)^3 ]
+    #   result: -v*(2*x^2-l^2) / (x^2 + l^2)^(5/2)
+    # Substitute back x to R, then sqrt(l^2 + R^2) to r_len:
+    #       v*(l^2 - 2R^2) / r_len^5
 
-    R_comp = (l_len2 - 2 * R_len2) / r_len ** 5
+    R_comp = numpy.sqrt(src_dir_len2) * (l_len2 - 2 * R_len2) / r_len ** 5
 
     l_comp *= coef
     R_comp *= coef
@@ -123,10 +122,16 @@ def calc_emi(tgt_pt, src_pt, src_dir, coef=1):
     #   dl x r / sqrt(l^2 + R^2)^3
     #
     # The "l" origin is selected at the closest point to the target to simplify calculations.
-    # Thus "r = l^2 + R^2" and "|dl x r| = |dl|.R", where R is distance between the target and origin.
+    # Thus "r^2 = l^2 + R^2" and "|dl x r| = |dl|.R", where R is distance between the target and origin.
     #
     # Use integral calculator https://www.integral-calculator.com/ (substitute l with x):
-    #   int[ R/sqrt(x^2 + R^2)^3 dx ] = x / (R * sqrt(x^2 + R^2)) + C
+    #   input: int[ R/sqrt(x^2 + R^2)^3 ]dx
+    #   result: x / (R*sqrt(x^2 + R^2))
+    # Substitute back x to l, then sqrt(l^2 + R^2) to r_len:
+    #       l / (R * r_len) + C
+    #
+    # Finally: (l1 x R / r1_len - l0 x R / r0_len) / R^2
+    #
     src_dir_len2 = src_dir.dot(src_dir)
     if not src_dir_len2:
         return emi_params   # Zero length, return zero EMI params
@@ -179,33 +184,38 @@ def calc_emi(tgt_pt, src_pt, src_dir, coef=1):
 
     emi_params[0] = B
 
-    # Calculate the partial derivatives from Biot–Savart law "R/sqrt(l^2 + R^2)^3" (see above)
-    # along "l" and "R" axes, then integrate each of them along 'l'.
+    # Calculate the partial derivatives, along "l" and "R" axes, from already integrated
+    # Biot–Savart law "l / (R*sqrt(l^2 + R^2))" (see above).
     #
-    # The individual gradient vector components are the values of these integrals. The 'l'
+    # The individual gradient vector components are the values of these derivatives. The 'l'
     # component is along the 'src_dir' direction and 'R' component is to the direction of its
     # perpendicular through 'tgt_pt'.
 
-    # Gradient component along 'l' (substitute l with x):
-    #   int[ dF(x)/dx dx] = F(x) => gradBx = R/sqrt(x^2 + R^2)^3 - R/sqrt(x^2 + R^2)^3 + C
-    # Finally:
-    #   R * (1/r1^3 - 1/r0^3)
+    # Gradient component along 'l' (falls back to original function):
+    #   d/dl[ int[ R / sqrt(R^2 + l^2)^3 ]dl ] = R / sqrt(R^2 + l^2)^3
+    #
+    # Substitute sqrt(l^2 + R^2) to r_len
+    #
+    # Finally: R * (1/r1_len^3 - 1/r0_len^3)
+    #
     R_len = numpy.sqrt(R_len2)
 
     l_comp = R_len * ( 1 / r1_len ** 3 - 1 / r0_len ** 3)
 
     # Gradient component along 'R':
+    #   d/dR[ l / (R*sqrt(l^2 + R^2)) ]
+    #
     # Use derivative calculator https://www.derivative-calculator.net/ (substitute R with x):
-    #   input: x / sqrt(x^2 + l^2)^3, result: - (2x^2 - l^2) / (x^2 + l^2)^(5/2)
-    # Substitute back x to R, then l with x:
-    #   result: (x^2 - 2R^2) / sqrt(x^2 + R^2)^5
-    # Use integral calculator https://www.integral-calculator.com/ (back R and x):
-    #   input: (x^2 - 2R^2) / sqrt(x^2 + R^2)^5, result: - (x^3 + 2xR^2) / ( R^2(x^2 + R^2)^(3/2) ) + C
-    # Simplify (substitute back x to l):
-    #   - (l^3 + 2*l*R^2) / ( R^2(l^2 + R^2)^(3/2) ) = - l(l^2 + R^2 + R^2) / ( R^2 * r^3 ) =
-    #   = - l(r^2 + R^2) / ( R^2 * r^3 )
-    # Finally:
-    #   - l1(r1^2 + R^2) / ( R^2 * r1^3 ) + l1(r1^2 + R^2) / ( R^2 * r0^3 )
+    #   input: d/dx[ l / (x*sqrt(l^2 + x^2)) ]
+    #   result: -(2*l*x^2 + l^3) / (x^2*(x^2 + l^2)^(3/2))
+    # Substitute back x to R:
+    #       -(2*l*R^2 + l^3) / (R^2*(R^2 + l^2)^(3/2))
+    # Substitute sqrt(l^2 + R^2) to r_len:
+    #       -l*(2*R^2 + l^2) / (R^2 * r_len^3) =
+    #       = -l*(R^2 + r_len^2) / (R^2 * r_len^3)
+    #
+    # Finally: -l1*(r1_len^2 + R^2) / (R^2 * r1_len^3) + l0*(r0_len^2 + R^2) / (R^2 * r0_len^3)
+    #
     l0_len = numpy.sqrt(l0.dot(l0))
     if l0.dot(src_dir) < 0:
         l0_len = -l0_len
