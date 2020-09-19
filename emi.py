@@ -77,14 +77,6 @@ def plot_source(ax, src_lines):
     src_dirs = src_lines[...,1:,:] - src_lines[...,:-1,:]
     return ax.quiver(*src_pts.transpose(), *src_dirs.transpose(), **SOURCE_FMT)
 
-def replace_collection(old, new):
-    """Replace collection by keeping its visibility"""
-    if old is not None:
-        visible = old.get_visible()
-        old.remove()
-        new.set_visible(visible)
-    return new
-
 def rotate_points(pts, axis, angle):
     # Shift the axes, to move the 'axis' to Z
     axis += 1
@@ -110,28 +102,33 @@ class main_data:
     src_lines = None
     tgt_pts = None
     # Matplotlib collections
-    src_coll = None
-    tgt_coll = None
-    B_coll= None
-    dB_coll= None
-    emf_coll= None
+    colls = {}
 
     def __init__(self, ax):
         self.ax = ax
+
+    def replace_collection(self, key, new):
+        """Replace collection in a dictionary by keeping its visibility"""
+        old = self.colls.get(key)
+        if old is not None:
+            visible = old.get_visible()
+            old.remove()
+            new.set_visible(visible)
+        self.colls[key] = new
 
     def redraw(self, src_lines, tgt_pts, coef=1):
         # EMI source lines
         if src_lines is None:
             src_lines = self.src_lines
         else:
-            self.src_coll = replace_collection(self.src_coll, plot_source(self.ax, src_lines))
+            self.replace_collection('src_coll', plot_source(self.ax, src_lines))
             self.src_lines = src_lines
 
         # Target points
         if tgt_pts is None:
             tgt_pts = self.tgt_pts
         else:
-            self.tgt_coll = replace_collection(self.tgt_coll, self.ax.scatter(*tgt_pts.transpose(), **TARGET_FMT))
+            self.replace_collection('tgt_coll', self.ax.scatter(*tgt_pts.transpose(), **TARGET_FMT))
             self.tgt_pts = tgt_pts
 
         # Calculate EMI parameters B and dB for each target point
@@ -179,21 +176,21 @@ class main_data:
         # Magnetic field
         if B_FMT:
             B = emi_params['B'].dot(FIELD_SCALE).transpose()
-            self.B_coll = replace_collection(self.B_coll, self.ax.quiver(*pts, *B, **B_FMT))
+            self.replace_collection('B_coll', self.ax.quiver(*pts, *B, **B_FMT))
 
-        # The field-gradient, i.e. the direction of "movement" of the field because of current increase
+        # The field-gradient, i.e. the direction of increase of the field magnitude
         if GRADB_FMT:
             dB = emi_params['gradB'].dot(FIELD_SCALE).transpose()
-            self.dB_coll = replace_collection(self.dB_coll, self.ax.quiver(*pts, *dB, **GRADB_FMT))
+            self.replace_collection('gradB_coll', self.ax.quiver(*pts, *dB, **GRADB_FMT))
 
         # The EMF induced because of field change
         if EMF_FMT:
             emf = emf_vecs.dot(EMF_SCALE).transpose()
-            self.emf_coll = replace_collection(self.emf_coll, self.ax.quiver(*pts, *emf, **EMF_FMT))
+            self.replace_collection('emf_coll', self.ax.quiver(*pts, *emf, **EMF_FMT))
         return True
 
     def get_collections(self):
-        return [self.src_coll, self.tgt_coll, self.B_coll, self.dB_coll, self.emf_coll]
+        return self.colls.values()
 
 class on_clicked:
     def __init__(self, data):
@@ -303,14 +300,14 @@ def main(argv):
     rect = [AX_BTN_WIDTH, 1 * AX_BTN_HEIGHT / AX_NUM_SLIDERS,
             1 - AX_BTN_WIDTH, AX_BTN_HEIGHT / AX_NUM_SLIDERS]
     rax = pyplot.axes(deflate_rect(rect, AX_TEXT_WIDTH + AX_MARGIN))
-    src_slider = widgets.Slider(rax, data.src_coll.get_label(), 0, 2, 1)
+    src_slider = widgets.Slider(rax, data.colls['src_coll'].get_label(), 0, 2, 1)
     src_slider.on_changed(src_changed(data, coil_param_changed(GEN_COIL_PARAMS, COIL_PARAM_CHANGE_XFORMS)))
 
     # Slider to move target points (slider 2)
     rect = [AX_BTN_WIDTH, 0 * AX_BTN_HEIGHT / AX_NUM_SLIDERS,
             1 - AX_BTN_WIDTH, AX_BTN_HEIGHT / AX_NUM_SLIDERS]
     rax = pyplot.axes(deflate_rect(rect, AX_TEXT_WIDTH + AX_MARGIN))
-    tgt_slider = widgets.Slider(rax, data.tgt_coll.get_label(), -2, 2, 0)
+    tgt_slider = widgets.Slider(rax, data.colls['tgt_coll'].get_label(), -2, 2, 0)
     tgt_slider.on_changed(tgt_changed(data, move_changed(TARGET_SLIDER_DIR)))
 
 
