@@ -39,6 +39,7 @@ SOURCE_FMT = dict(color='green', label='Source')
 TARGET_FMT = dict(color='blue', marker='+', label='Target')
 B_FMT = dict(color='magenta', linestyle='--', label='Field', visible=False)
 GRADB_FMT = dict(color='yellow', linestyle=':', label='Field gradient', visible=False)
+DR_DI_FMT = dict(color='orange', linestyle=':', label='I.dr/dI', visible=True)
 EMF_FMT = dict(color='red', linestyle='-.', label='EM Force')
 
 # From https://stackoverflow.com/questions/13685386/matplotlib-equal-unit-length-with-equal-aspect-ratio-z-axis-is-not-equal-to
@@ -158,6 +159,11 @@ class main_data:
         if GRADB_FMT:
             dB = emi_params['gradB'].dot(FIELD_SCALE).transpose()
             replace_collection(self.colls, 'gradB_coll', self.ax.quiver(*pts, *dB, **GRADB_FMT))
+
+        # The field-gradient, i.e. the "movement" of the field because of current increase
+        if DR_DI_FMT:
+            dr_dI = emi_params['dr_dI'].dot(FIELD_SCALE).transpose()
+            replace_collection(self.colls, 'dr_dI_coll', self.ax.quiver(*pts, *dr_dI, **DR_DI_FMT))
 
         # The EMF induced because of field change
         if EMF_FMT:
