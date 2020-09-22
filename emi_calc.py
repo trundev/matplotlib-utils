@@ -5,7 +5,7 @@ Requires: numpy
 import sys
 import numpy
 
-def build_jacobian(l_comp, R_comp, l_vect, R_vect, B_vect):
+def build_jacobian(l_comp, R_comp, B_comp, l_vect, R_vect, B_vect):
     """Combine gradient components along 'l' and 'R' into a Jacobian matrix"""
     l_len = numpy.sqrt((l_vect * l_vect).sum(-1))
     R_len = numpy.sqrt((R_vect * R_vect).sum(-1))
@@ -14,7 +14,7 @@ def build_jacobian(l_comp, R_comp, l_vect, R_vect, B_vect):
     jacob = numpy.zeros((B_vect.shape[-1], B_vect.shape[-1]), B_vect.dtype)
 
     # This is in the space with a standard basis along the "l", "R" and "B" axes
-    jacob[1, 2] = -B_len / R_len
+    jacob[1, 2] = B_comp
     jacob[2, 0] = l_comp
     jacob[2, 1] = R_comp
 
@@ -92,11 +92,20 @@ def calc_emi_dif(tgt_pt, src_pt, src_dir, coef=1):
 
     R_comp = numpy.sqrt(src_dir_len2) * (l_len2 - 2 * R_len2) / r_len ** 5
 
+    # Gradient component along 'B' [-v.B/sqrt(R^2 + l^2 + B^2)^3]:
+    # Use derivative calculator https://www.derivative-calculator.net/ (substitute B with x):
+    #   input: d/dx[ -v*x / sqrt(R^2 + l^2 + x^2)^3 ]
+    #   result: v*(2*x-R^2-l^2) /  (x^2 + R^2 + l^2)^(5/2)
+    # Substitute back x to B (which is zero), then sqrt(l^2 + R^2) to r_len:
+    # Finally: -v / r_len^3
+    B_comp = -numpy.sqrt(src_dir_len2) / r_len ** 3
+
     l_comp *= coef
     R_comp *= coef
+    B_comp *= coef
 
     # Combine l_comp and R_comp into a Jacobian matrix
-    emi_params[1] = build_jacobian(l_comp, R_comp, src_dir, R, B)
+    emi_params[1] = build_jacobian(l_comp, R_comp, B_comp, src_dir, R, B)
 
     return emi_params
 
@@ -226,12 +235,25 @@ def calc_emi(tgt_pt, src_pt, src_dir, coef=1):
     R_comp = -l1_len*(r1_len ** 2 + R_len2) / (R_len2 * r1_len ** 3)
     R_comp -= -l0_len*(r0_len ** 2 + R_len2) / (R_len2 * r0_len ** 3)
 
+    # Gradient component along 'B':
+    #   int[ -1 / sqrt(l^2 + R^2)^3 ]dl
+    #
+    # Use integral calculator https://www.integral-calculator.com/ (substitute l with x):
+    #   input: int[ -1/sqrt(x^2 + R^2)^3 ]dx
+    #   result: -x/(R^2 * sqrt(x^2 + R^2)) + C
+    # Substitute back x to l, then sqrt(l^2 + R^2) to r_len:
+    #   -l/(R^2*r_len)
+    # Finally: -l1 / (R^2*r1_len) + l0 / (R^2*r0_len)
+    B_comp = -l1_len/(R_len2*r1_len)
+    B_comp -= -l0_len/(R_len2*r0_len)
+
     # The '-' is to flip direction to point toward field magnitude increase
     l_comp *= -coef
     R_comp *= coef
+    B_comp *= coef
 
     # Combine l_comp and R_comp into a Jacobian matrix
-    emi_params[1] = build_jacobian(l_comp, R_comp, src_dir, R, B)
+    emi_params[1] = build_jacobian(l_comp, R_comp, B_comp, src_dir, R, B)
 
     return emi_params
 
