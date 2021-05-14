@@ -235,7 +235,7 @@ def calc_emi(tgt_pt, src_pt, src_dir, coef=1):
 
     return emi_params
 
-def generate_dr_dI(B, jacob):
+def generate_dr_dI_old(B, jacob):
     """Calculate I.dr/dI (a vector to be multiplied by dI/I)
 
     The dr/dI is an imaginary change in the point position (dr), that would provoke the same EMI effect as a
@@ -248,6 +248,24 @@ def generate_dr_dI(B, jacob):
     B_jacob = numpy.matmul(B, jacob)
     dr_dI = B_jacob / (B_jacob * B_jacob).sum(-1)
     dr_dI *= (B * B).sum(-1)
+    return dr_dI
+
+def generate_dr_dI(B, jacob):
+    """Calculate I.dr/dI (a vector to be multiplied by dI/I)
+
+    The dr/dI is an imaginary change in the point position (dr), that would provoke the same EMI effect as a
+    change in the electric current (dI/I). The movement calculated by using inverse Jacobian, so as the dB
+    to be equal to B.
+    """
+    # dB = Jacob.dr => Jacob^-1.dB = Jacob^-1.Jacob.dr => dr = Jacob^-1.dB
+    # Replace dB/dI = B/I: dr => Jacob^-1.B.dI/I =>
+    # =>  I.dr/dI = Jacob^-1.B
+    try:
+        jacob_inv = numpy.linalg.inv(jacob)
+        dr_dI = numpy.matmul(jacob_inv, B)
+    except numpy.linalg.LinAlgError as ex:
+        print('Exception:', ex, file=sys.stderr)
+        return numpy.zeros_like(B)
     return dr_dI
 
 def generate_gradB(B, jacob):
