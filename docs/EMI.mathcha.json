@@ -12420,14 +12420,651 @@
     {
       "blocks": [
         {
-          "text": "\\horizontal-line",
+          "text": "The matrix "
+        },
+        {
+          "text": "\\tag-ref",
           "type": "composite",
-          "elements": {}
+          "elements": {},
+          "refTagId": "tid0.2180710967583015"
+        },
+        {
+          "text": " can be transformed to the main coordinate system by using transformation matrix:"
+        }
+      ]
+    },
+    {
+      "blocks": [
+        {
+          "text": "\\math-container",
+          "type": "composite",
+          "elements": {
+            "mathValue": {
+              "lines": [
+                {
+                  "blocks": [
+                    {
+                      "style": {
+                        "mathModeType": "\\displaystyle",
+                        "mathType": "\\mathbf"
+                      },
+                      "text": "J"
+                    },
+                    {
+                      "text": "\\power-index",
+                      "type": "composite",
+                      "elements": {
+                        "indexValue": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "B/v"
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "powerValue": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "m"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      "style": {
+                        "mathModeType": "\\displaystyle"
+                      }
+                    },
+                    {
+                      "text": "=",
+                      "style": {
+                        "mathModeType": "\\displaystyle"
+                      }
+                    },
+                    {
+                      "type": "single",
+                      "text": "(",
+                      "style": {
+                        "mathModeType": "\\displaystyle"
+                      }
+                    },
+                    {
+                      "text": "T.",
+                      "style": {
+                        "mathModeType": "\\displaystyle"
+                      }
+                    },
+                    {
+                      "style": {
+                        "mathModeType": "\\displaystyle",
+                        "mathType": "\\mathbf"
+                      },
+                      "text": "J"
+                    },
+                    {
+                      "text": "\\power-index",
+                      "type": "composite",
+                      "elements": {
+                        "indexValue": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "B/v"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      "style": {
+                        "mathModeType": "\\displaystyle"
+                      }
+                    },
+                    {
+                      "text": "\\power",
+                      "type": "composite",
+                      "elements": {
+                        "powerValue": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "T"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      "style": {
+                        "mathModeType": "\\displaystyle"
+                      }
+                    },
+                    {
+                      "text": ".T",
+                      "style": {
+                        "mathModeType": "\\displaystyle"
+                      }
+                    },
+                    {
+                      "text": "\\power",
+                      "type": "composite",
+                      "elements": {
+                        "powerValue": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "-1"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      "style": {
+                        "mathModeType": "\\displaystyle"
+                      }
+                    },
+                    {
+                      "type": "single",
+                      "text": ")",
+                      "style": {
+                        "mathModeType": "\\displaystyle"
+                      }
+                    },
+                    {
+                      "text": "\\power",
+                      "type": "composite",
+                      "elements": {
+                        "powerValue": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "T"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      "style": {
+                        "mathModeType": "\\displaystyle"
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "displayMode": false,
+          "style": {
+            "mathModeType": "\\displaystyle"
+          }
+        },
+        {
+          "text": ", where "
+        },
+        {
+          "text": "\\math-container",
+          "type": "composite",
+          "elements": {
+            "mathValue": {
+              "lines": [
+                {
+                  "blocks": [
+                    {
+                      "text": "T="
+                    },
+                    {
+                      "type": "composite",
+                      "text": "\\matrix",
+                      "row": 3,
+                      "column": 3,
+                      "elements": {
+                        "0_0": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "\\hat",
+                                  "type": "composite",
+                                  "elements": {
+                                    "value": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "ℓ"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                {
+                                  "text": "\\index",
+                                  "type": "composite",
+                                  "elements": {
+                                    "indexValue": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "x"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "0_1": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "\\hat",
+                                  "type": "composite",
+                                  "elements": {
+                                    "value": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "R"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                {
+                                  "text": "\\index",
+                                  "type": "composite",
+                                  "elements": {
+                                    "indexValue": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "x"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "0_2": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "\\hat",
+                                  "type": "composite",
+                                  "elements": {
+                                    "value": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "B"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                {
+                                  "text": "\\index",
+                                  "type": "composite",
+                                  "elements": {
+                                    "indexValue": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "x"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "1_0": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "\\hat",
+                                  "type": "composite",
+                                  "elements": {
+                                    "value": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "ℓ"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                {
+                                  "text": "\\index",
+                                  "type": "composite",
+                                  "elements": {
+                                    "indexValue": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "y"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "1_1": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "\\hat",
+                                  "type": "composite",
+                                  "elements": {
+                                    "value": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "R"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                {
+                                  "text": "\\index",
+                                  "type": "composite",
+                                  "elements": {
+                                    "indexValue": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "y"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "1_2": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "\\hat",
+                                  "type": "composite",
+                                  "elements": {
+                                    "value": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "B"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                {
+                                  "text": "\\index",
+                                  "type": "composite",
+                                  "elements": {
+                                    "indexValue": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "y"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "2_0": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "\\hat",
+                                  "type": "composite",
+                                  "elements": {
+                                    "value": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "ℓ"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                {
+                                  "text": "\\index",
+                                  "type": "composite",
+                                  "elements": {
+                                    "indexValue": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "z"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "2_1": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "\\hat",
+                                  "type": "composite",
+                                  "elements": {
+                                    "value": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "R"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                {
+                                  "text": "\\index",
+                                  "type": "composite",
+                                  "elements": {
+                                    "indexValue": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "z"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        "2_2": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "\\hat",
+                                  "type": "composite",
+                                  "elements": {
+                                    "value": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "B"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                },
+                                {
+                                  "text": "\\index",
+                                  "type": "composite",
+                                  "elements": {
+                                    "indexValue": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "z"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      "bracket": "[",
+                      "style": {
+                        "mathModeType": "\\displaystyle"
+                      },
+                      "borderSeparation": {}
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "displayMode": false,
+          "style": {
+            "mathModeType": "\\displaystyle"
+          }
+        },
+        {
+          "text": " "
         }
       ],
       "style": {
         "align": "center"
       }
+    },
+    {
+      "blocks": [
+        {
+          "text": "\\math-container",
+          "type": "composite",
+          "elements": {
+            "mathValue": {
+              "lines": [
+                {
+                  "blocks": []
+                }
+              ]
+            }
+          },
+          "displayMode": false,
+          "style": {
+            "mathModeType": "\\displaystyle"
+          }
+        }
+      ],
+      "style": {
+        "align": "center"
+      }
+    },
+    {
+      "blocks": [
+        {
+          "text": "\\horizontal-line",
+          "type": "composite",
+          "elements": {}
+        }
+      ]
     },
     {
       "blocks": [
@@ -13798,13 +14435,7 @@
     {
       "blocks": [
         {
-          "text": "Calculate the Integral of...: "
-        },
-        {
-          "text": "R/(x^2+R^2)^(3/2)",
-          "style": {
-            "fontName": "pcr"
-          }
+          "text": "Calculate the Integral of...:"
         }
       ],
       "style": {
@@ -13814,40 +14445,275 @@
     {
       "blocks": [
         {
-          "text": "Result: "
-        },
-        {
-          "text": "\\math-container",
           "type": "composite",
+          "text": "\\table",
           "elements": {
-            "mathValue": {
+            "0_0": {
               "lines": [
                 {
                   "blocks": [
                     {
-                      "text": "\\dfrac",
+                      "text": "function"
+                    }
+                  ]
+                }
+              ],
+              "style": {
+                "borders": {
+                  "left": {
+                    "borderType": "dotted"
+                  },
+                  "top": {
+                    "borderType": "dotted"
+                  },
+                  "right": {
+                    "borderType": "dotted"
+                  },
+                  "bottom": {
+                    "borderType": "solid"
+                  }
+                }
+              }
+            },
+            "0_1": {
+              "lines": [
+                {
+                  "blocks": [
+                    {
+                      "text": "HTML input"
+                    }
+                  ]
+                }
+              ],
+              "style": {
+                "borders": {
+                  "left": {
+                    "borderType": "dotted"
+                  },
+                  "top": {
+                    "borderType": "dotted"
+                  },
+                  "right": {
+                    "borderType": "dotted"
+                  },
+                  "bottom": {
+                    "borderType": "solid"
+                  }
+                }
+              }
+            },
+            "0_2": {
+              "lines": [
+                {
+                  "blocks": [
+                    {
+                      "text": "result "
+                    },
+                    {
+                      "text": "\\math-container",
                       "type": "composite",
                       "elements": {
-                        "value": {
+                        "mathValue": {
                           "lines": [
                             {
                               "blocks": [
                                 {
-                                  "text": "x"
+                                  "text": "d/dx"
                                 }
                               ]
                             }
                           ]
-                        },
-                        "sub1": {
+                        }
+                      },
+                      "displayMode": false,
+                      "style": {
+                        "mathModeType": "\\displaystyle"
+                      }
+                    }
+                  ]
+                }
+              ],
+              "style": {
+                "borders": {
+                  "left": {
+                    "borderType": "dotted"
+                  },
+                  "top": {
+                    "borderType": "dotted"
+                  },
+                  "right": {
+                    "borderType": "dotted"
+                  },
+                  "bottom": {
+                    "borderType": "solid"
+                  }
+                }
+              }
+            },
+            "1_0": {
+              "lines": [
+                {
+                  "blocks": [
+                    {
+                      "text": "\\math-container",
+                      "type": "composite",
+                      "elements": {
+                        "mathValue": {
                           "lines": [
                             {
                               "blocks": [
                                 {
-                                  "text": "R"
+                                  "text": "\\frac",
+                                  "type": "composite",
+                                  "elements": {
+                                    "value": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "-3ℓR"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "sub1": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "|"
+                                            },
+                                            {
+                                              "type": "composite",
+                                              "text": "\\overrightarrow",
+                                              "elements": {
+                                                "value": {
+                                                  "lines": [
+                                                    {
+                                                      "blocks": [
+                                                        {
+                                                          "text": "r"
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              }
+                                            },
+                                            {
+                                              "text": "|"
+                                            },
+                                            {
+                                              "text": "\\power",
+                                              "type": "composite",
+                                              "elements": {
+                                                "powerValue": {
+                                                  "lines": [
+                                                    {
+                                                      "blocks": [
+                                                        {
+                                                          "text": "5"
+                                                        }
+                                                      ]
+                                                    }
+                                                  ]
+                                                }
+                                              }
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
                                 },
                                 {
-                                  "text": "\\sqrt",
+                                  "text": "dℓ"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      "displayMode": false,
+                      "style": {
+                        "mathModeType": "\\displaystyle"
+                      }
+                    }
+                  ],
+                  "style": {
+                    "align": "center"
+                  }
+                }
+              ],
+              "style": {
+                "border": 15,
+                "borders": {
+                  "top": {
+                    "borderType": "solid"
+                  },
+                  "left": {
+                    "borderType": "solid"
+                  },
+                  "right": {
+                    "borderType": "solid"
+                  },
+                  "bottom": {
+                    "borderType": "solid"
+                  }
+                },
+                "v-align": "middle"
+              }
+            },
+            "1_1": {
+              "lines": [
+                {
+                  "blocks": [
+                    {
+                      "text": "R/(x^2+R^2)^(3/2)",
+                      "style": {
+                        "fontName": "pcr"
+                      }
+                    }
+                  ],
+                  "style": {
+                    "align": "center"
+                  }
+                }
+              ],
+              "style": {
+                "border": 15,
+                "borders": {
+                  "top": {
+                    "borderType": "solid"
+                  },
+                  "left": {
+                    "borderType": "solid"
+                  },
+                  "right": {
+                    "borderType": "solid"
+                  },
+                  "bottom": {
+                    "borderType": "solid"
+                  }
+                },
+                "v-align": "middle"
+              }
+            },
+            "1_2": {
+              "lines": [
+                {
+                  "blocks": [
+                    {
+                      "text": "\\math-container",
+                      "type": "composite",
+                      "elements": {
+                        "mathValue": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "\\dfrac",
                                   "type": "composite",
                                   "elements": {
                                     "value": {
@@ -13856,73 +14722,121 @@
                                           "blocks": [
                                             {
                                               "text": "x"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    },
+                                    "sub1": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "R"
                                             },
                                             {
+                                              "text": "\\sqrt",
                                               "type": "composite",
                                               "elements": {
-                                                "powerValue": {
+                                                "value": {
                                                   "lines": [
                                                     {
                                                       "blocks": [
                                                         {
-                                                          "text": "2"
+                                                          "text": "x"
+                                                        },
+                                                        {
+                                                          "type": "composite",
+                                                          "elements": {
+                                                            "powerValue": {
+                                                              "lines": [
+                                                                {
+                                                                  "blocks": [
+                                                                    {
+                                                                      "text": "2"
+                                                                    }
+                                                                  ]
+                                                                }
+                                                              ]
+                                                            }
+                                                          },
+                                                          "text": "\\power"
+                                                        },
+                                                        {
+                                                          "text": "+R"
+                                                        },
+                                                        {
+                                                          "type": "composite",
+                                                          "elements": {
+                                                            "powerValue": {
+                                                              "lines": [
+                                                                {
+                                                                  "blocks": [
+                                                                    {
+                                                                      "text": "2"
+                                                                    }
+                                                                  ]
+                                                                }
+                                                              ]
+                                                            }
+                                                          },
+                                                          "text": "\\power"
                                                         }
                                                       ]
                                                     }
                                                   ]
                                                 }
-                                              },
-                                              "text": "\\power"
-                                            },
-                                            {
-                                              "text": "+R"
-                                            },
-                                            {
-                                              "type": "composite",
-                                              "elements": {
-                                                "powerValue": {
-                                                  "lines": [
-                                                    {
-                                                      "blocks": [
-                                                        {
-                                                          "text": "2"
-                                                        }
-                                                      ]
-                                                    }
-                                                  ]
-                                                }
-                                              },
-                                              "text": "\\power"
+                                              }
                                             }
                                           ]
                                         }
                                       ]
                                     }
                                   }
+                                },
+                                {
+                                  "text": " + C"
                                 }
                               ]
                             }
                           ]
                         }
+                      },
+                      "displayMode": false,
+                      "style": {
+                        "mathModeType": "\\displaystyle"
                       }
                     }
-                  ]
+                  ],
+                  "style": {
+                    "align": "center"
+                  }
                 }
-              ]
+              ],
+              "style": {
+                "border": 15,
+                "borders": {
+                  "top": {
+                    "borderType": "solid"
+                  },
+                  "left": {
+                    "borderType": "solid"
+                  },
+                  "right": {
+                    "borderType": "solid"
+                  },
+                  "bottom": {
+                    "borderType": "solid"
+                  }
+                },
+                "v-align": "middle"
+              }
             }
           },
-          "displayMode": false,
-          "style": {
-            "mathModeType": "\\displaystyle"
-          }
-        },
-        {
-          "text": " + C"
+          "row": 2,
+          "column": 3
         }
-      ],
-      "style": {
-        "listType": "unorder"
-      }
+      ]
     },
     {
       "blocks": []
@@ -13998,7 +14912,10 @@
             "mathModeType": "\\displaystyle"
           }
         }
-      ]
+      ],
+      "style": {
+        "listType": "unorder"
+      }
     },
     {
       "blocks": [
@@ -14453,6 +15370,23 @@
                               "blocks": [
                                 {
                                   "text": "ℓ"
+                                },
+                                {
+                                  "text": "\\index",
+                                  "type": "composite",
+                                  "elements": {
+                                    "indexValue": {
+                                      "lines": [
+                                        {
+                                          "blocks": [
+                                            {
+                                              "text": "n"
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  }
                                 }
                               ]
                             }
@@ -14663,7 +15597,7 @@
     {
       "blocks": [
         {
-          "text": "Also the length of "
+          "text": "Also the cross-product length "
         },
         {
           "text": "\\math-container",
@@ -14673,6 +15607,10 @@
               "lines": [
                 {
                   "blocks": [
+                    {
+                      "type": "single",
+                      "text": "\\left|"
+                    },
                     {
                       "type": "composite",
                       "text": "\\overrightarrow",
@@ -14726,30 +15664,13 @@
                           ]
                         }
                       }
-                    }
-                  ]
-                }
-              ]
-            }
-          },
-          "displayMode": false,
-          "style": {
-            "mathModeType": "\\displaystyle"
-          }
-        },
-        {
-          "text": " is "
-        },
-        {
-          "text": "\\math-container",
-          "type": "composite",
-          "elements": {
-            "mathValue": {
-              "lines": [
-                {
-                  "blocks": [
+                    },
                     {
-                      "text": "ℓ"
+                      "type": "single",
+                      "text": "\\right|"
+                    },
+                    {
+                      "text": "=ℓ"
                     },
                     {
                       "text": "\\index",
@@ -15777,9 +16698,121 @@
     {
       "blocks": [
         {
-          "text": "Calculate the Integral of...: "
+          "text": "tegrate the function "
+        },
+        {
+          "text": "\\math-container",
+          "type": "composite",
+          "elements": {
+            "mathValue": {
+              "lines": [
+                {
+                  "blocks": [
+                    {
+                      "style": {
+                        "mathModeType": "\\displaystyle",
+                        "mathType": "\\mathbf"
+                      },
+                      "text": "J"
+                    },
+                    {
+                      "text": "\\index",
+                      "type": "composite",
+                      "elements": {
+                        "indexValue": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "B/r"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      },
+                      "style": {
+                        "mathModeType": "\\displaystyle"
+                      }
+                    },
+                    {
+                      "type": "single",
+                      "text": "("
+                    },
+                    {
+                      "text": "ℓ"
+                    },
+                    {
+                      "type": "single",
+                      "text": ")"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "displayMode": false,
+          "style": {
+            "mathModeType": "\\displaystyle"
+          }
+        },
+        {
+          "text": ", by using "
+        },
+        {
+          "text": "https://www.integral-calculator.com/",
+          "style": {
+            "hyperLink": "https://www.integral-calculator.com/"
+          }
+        },
+        {
+          "text": " (",
+          "style": {}
+        },
+        {
+          "text": "\\math-container",
+          "type": "composite",
+          "elements": {
+            "mathValue": {
+              "lines": [
+                {
+                  "blocks": [
+                    {
+                      "text": "x"
+                    },
+                    {
+                      "text": "\\rightarrow",
+                      "type": "composite",
+                      "elements": {}
+                    },
+                    {
+                      "text": "ℓ"
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "displayMode": false,
+          "style": {
+            "mathModeType": "\\displaystyle"
+          }
+        },
+        {
+          "text": "):",
+          "style": {}
         }
       ]
+    },
+    {
+      "blocks": [
+        {
+          "text": "Calculate the Integral of...: "
+        }
+      ],
+      "style": {
+        "listType": "unorder"
+      }
     },
     {
       "blocks": [
@@ -15868,41 +16901,6 @@
                       "style": {
                         "mathModeType": "\\displaystyle"
                       }
-                    },
-                    {
-                      "text": " ("
-                    },
-                    {
-                      "text": "\\math-container",
-                      "type": "composite",
-                      "elements": {
-                        "mathValue": {
-                          "lines": [
-                            {
-                              "blocks": [
-                                {
-                                  "text": "x"
-                                },
-                                {
-                                  "text": "\\rightarrow",
-                                  "type": "composite",
-                                  "elements": {}
-                                },
-                                {
-                                  "text": "ℓ"
-                                }
-                              ]
-                            }
-                          ]
-                        }
-                      },
-                      "displayMode": false,
-                      "style": {
-                        "mathModeType": "\\displaystyle"
-                      }
-                    },
-                    {
-                      "text": ")"
                     }
                   ]
                 }
@@ -16901,6 +17899,88 @@
       ],
       "style": {
         "align": "center"
+      }
+    },
+    {
+      "blocks": [],
+      "style": {
+        "align": "center"
+      }
+    },
+    {
+      "blocks": [
+        {
+          "text": "Integral bounds: "
+        },
+        {
+          "text": "\\math-container",
+          "type": "composite",
+          "elements": {
+            "mathValue": {
+              "lines": [
+                {
+                  "blocks": [
+                    {
+                      "text": "x"
+                    },
+                    {
+                      "text": "\\rightarrow",
+                      "type": "composite",
+                      "elements": {}
+                    },
+                    {
+                      "text": "ℓ"
+                    },
+                    {
+                      "text": "\\index",
+                      "type": "composite",
+                      "elements": {
+                        "indexValue": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "1"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    {
+                      "text": ", ℓ"
+                    },
+                    {
+                      "text": "\\index",
+                      "type": "composite",
+                      "elements": {
+                        "indexValue": {
+                          "lines": [
+                            {
+                              "blocks": [
+                                {
+                                  "text": "0"
+                                }
+                              ]
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          },
+          "displayMode": false,
+          "style": {
+            "mathModeType": "\\displaystyle"
+          }
+        }
+      ],
+      "style": {
+        "listType": "unorder"
       }
     }
   ],
